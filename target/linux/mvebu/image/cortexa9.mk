@@ -344,3 +344,21 @@ define Device/solidrun_clearfog-pro-a1
   SUPPORTED_DEVICES += armada-388-clearfog armada-388-clearfog-pro
 endef
 TARGET_DEVICES += solidrun_clearfog-pro-a1
+
+define Device/wd_cloud-gen2
+  DEVICE_VENDOR := Western Digital
+  DEVICE_MODEL := MyCloud Gen 2 (WD_Glacier)
+  DEVICE_PACKAGES += -uboot-envtools mkf2fs e2fsprogs badblocks \
+	partx-utils kmod-hwmon-drivetemp kmod-usb-storage kmod-fs-vfat
+  DEVICE_DTS := armada-375-wd_cloud-gen2
+  KERNEL := kernel-bin | append-dtb |uImage gzip
+  KERNEL_INSTALL := 1
+  KERNEL_SUFFIX := -uImage
+  KERNEL_INITRAMFS := kernel-bin | append-dtb | uImage gzip
+  FILESYSTEMS := squashfs ext4
+  IMAGES := root.gz uRamdisk gzip-initramfs
+  IMAGE/root.gz := append-rootfs | gzip
+  IMAGE/gzip-initramfs := kernel-bin | append-dtb | libdeflate-gzip | uImage gzip
+  IMAGE/uRamdisk := append-rootfs | uImage gzip
+endef
+TARGET_DEVICES += wd_cloud-gen2
