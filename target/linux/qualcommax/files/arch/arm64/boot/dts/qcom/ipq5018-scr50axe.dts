@@ -1,0 +1,542 @@
+/dts-v1/;
+
+#include "ipq5018.dtsi"
+#include "ipq5018-ess.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Zyxel SCR50AXE";
+	compatible ="zyxel,scr50axe", "qcom,ipq5018";
+
+	aliases {
+		label-mac-device = &dp2;
+		led-boot = &led_power_blue;
+		led-failsafe = &led_power_red;
+		led-upgrade = &led_power_green;
+		led-running = &led_power_green;
+		serial0 = &blsp1_uart1;
+	};
+
+	chosen {
+		bootargs-append = " root=/dev/ubiblock0_1 swiotlb=1 coherent_pool=2M";
+		stdout-path = "serial0:115200n8";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&button_pins>;
+		pinctrl-names = "default";
+
+		reset {
+			label = "reset";
+			gpios = <&tlmm 22 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+
+		wps {
+			label = "wps";
+			gpios = <&tlmm 38 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-0 = <&leds_pins>;
+		pinctrl-names = "default";
+
+		led_power_red: R1 {
+			label = "power:red";
+			color = <LED_COLOR_ID_RED>;
+			gpios = <&tlmm 40 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_power_green: G1 {
+			label = "power:green";
+			color = <LED_COLOR_ID_GREEN>;
+			gpios = <&tlmm 11 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_power_blue: B1 {
+			label = "power:blue";
+			color = <LED_COLOR_ID_BLUE>;
+			gpios = <&tlmm 10 GPIO_ACTIVE_HIGH>;
+		};
+
+		R2 {
+			label = "info:red";
+			color = <LED_COLOR_ID_RED>;
+			gpios = <&tlmm 26 GPIO_ACTIVE_HIGH>;
+		};
+
+		G2 {
+			label = "info:green";
+			color = <LED_COLOR_ID_GREEN>;
+			gpios = <&tlmm 35 GPIO_ACTIVE_HIGH>;
+		};
+
+		B2 {
+			label = "info:blue";
+			color = <LED_COLOR_ID_BLUE>;
+			gpios = <&tlmm 32 GPIO_ACTIVE_HIGH>;
+		};
+
+		R3 {
+			label = "cloud:red";
+			color = <LED_COLOR_ID_RED>;
+			gpios = <&tlmm 25 GPIO_ACTIVE_HIGH>;
+		};
+
+		G3 {
+			label = "cloud:green";
+			color = <LED_COLOR_ID_GREEN>;
+			gpios = <&tlmm 34 GPIO_ACTIVE_HIGH>;
+		};
+
+		B3 {
+			label = "cloud:blue";
+			color = <LED_COLOR_ID_BLUE>;
+			gpios = <&tlmm 24 GPIO_ACTIVE_HIGH>;
+		};
+
+		R4 {
+			label = "wifi:red";
+			color = <LED_COLOR_ID_RED>;
+			gpios = <&tlmm 31 GPIO_ACTIVE_HIGH>;
+		};
+
+		G4 {
+			label = "wifi:green";
+			color = <LED_COLOR_ID_GREEN>;
+			gpios = <&tlmm 33 GPIO_ACTIVE_HIGH>;
+		};
+
+		B4 {
+			label = "wifi:blue";
+			color = <LED_COLOR_ID_BLUE>;
+			gpios = <&tlmm 30 GPIO_ACTIVE_HIGH>;
+		};
+
+		G5 {
+			label = "wps:green";
+			color = <LED_COLOR_ID_GREEN>;
+			gpios = <&tlmm 12 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	reserved-memory {
+
+		q6_mem_regions: q6_mem_regions@4b000000 {
+			no-map;
+			reg = <0x0 0x4b000000 0x0 0x4400000>;
+		};
+	};
+};
+
+&switch {
+	status = "okay";
+	switch_mac_mode = <MAC_MODE_SGMII_CHANNEL0>;
+
+	qcom,port_phyinfo {
+
+		port@0 {
+			port_id = <1>;
+			mdiobus = <&mdio0>;
+			phy_address = <7>;
+		};
+
+		port@1 {
+			port_id = <2>;
+			forced-speed = <1000>;
+			forced-duplex = <1>;
+		};
+	};
+};
+
+&dp1 {
+	status = "okay";
+
+	label = "wan";
+	nvmem-cells = <&macaddr_appsblenv_ethaddr 0>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp2 {
+	status = "okay";
+	nvmem-cells = <&macaddr_appsblenv_ethaddr (-4)>;
+	nvmem-cell-names = "mac-address";
+
+	fixed-link {
+		speed = <1000>;
+		full-duplex;
+	};
+};
+
+&mdio0 {
+	status = "okay";
+};
+
+&mdio1 {
+	status = "okay";
+	pinctrl-0 = <&mdio1_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&tlmm 39 GPIO_ACTIVE_LOW>;
+
+	qca8337_0: ethernet-phy@0 {
+		reg = <0>;
+	};
+
+	qca8337_1: ethernet-phy@1 {
+		reg = <1>;
+	};
+
+	qca8337_2: ethernet-phy@2 {
+		reg = <2>;
+	};
+
+	qca8337_3: ethernet-phy@3 {
+		reg = <3>;
+	};
+
+	ethernet-switch@18 {
+		compatible = "qca,qca8337";
+		reg = <0x18>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 {
+				reg = <1>;
+				label = "lan1";
+				phy-handle = <&qca8337_0>;
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "lan2";
+				phy-handle = <&qca8337_1>;
+			};
+
+			port@3 {
+				reg = <3>;
+				label = "lan3";
+				phy-handle = <&qca8337_2>;
+			};
+
+			port@4 {
+				reg = <4>;
+				label = "lan4";
+				phy-handle = <&qca8337_3>;
+			};
+
+			port@6 {
+				reg = <6>;
+				phy-mode = "sgmii";
+				ethernet = <&dp2>;
+				qca,sgmii-enable-pll;
+
+				fixed-link {
+					speed = <1000>;
+					full-duplex;
+				};
+			};
+		};
+	};
+};
+
+&sleep_clk {
+	clock-frequency = <32000>;
+};
+
+&xo_board_clk {
+	clock-div = <4>;
+	clock-mult = <1>;
+};
+
+&blsp1_uart1 {
+	status = "okay";
+	pinctrl-0 = <&serial_0_pins>;
+	pinctrl-names = "default";
+};
+
+&crypto {
+	status = "okay";
+};
+
+&cryptobam {
+	status = "okay";
+};
+
+&prng {
+	status = "okay";
+};
+
+&qfprom {
+	status = "okay";
+};
+
+&qpic_bam {
+	status = "okay";
+};
+
+&qpic_nand {
+	pinctrl-0 = <&qpic_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	nand@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		nand-ecc-engine = <&qpic_nand>;
+		nand-bus-width = <8>;
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+
+		partitions {
+			compatible = "qcom,smem-part";
+
+			partition-0-appsblenv {
+				compatible = "fixed-partitions";
+				label = "0:appsblenv";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				partition@0 {
+					label = "env-data";
+					reg = <0x0 0x40000>;
+
+					nvmem-layout {
+						compatible = "u-boot,env";
+
+						macaddr_appsblenv_ethaddr: ethaddr {
+							compatible = "mac-base";
+							#nvmem-cell-cells = <1>;
+						};
+					};
+				};
+			};
+		};
+
+	};
+};
+
+&tlmm {
+	mdio1_pins: mdio-state {
+
+		mdc-pins {
+			pins = "gpio36";
+			function = "mdc";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+
+		mdio-pins {
+			pins = "gpio37";
+			function = "mdio";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+	};
+
+	leds_pins: leds-pins {
+		pins = "gpio26", "gpio35", "gpio32", "gpio25", "gpio34",
+		       "gpio24", "gpio31", "gpio33", "gpio30", "gpio10",
+		       "gpio11", "gpio12", "gpio40";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-down;
+	};
+
+	button_pins: button-pins {
+		pins = "gpio22", "gpio38";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	qpic_pins: qpic-state {
+
+		clock-pins {
+			pins = "gpio9";
+			function = "qspi_clk";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		cs-pins {
+			pins = "gpio8";
+			function = "qspi_cs";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio4", "gpio5", "gpio6", "gpio7";
+			function = "qspi_data";
+			drive-strength = <8>;
+			bias-disable;
+		};
+	};
+
+	serial_0_pins: uart0-state {
+		pins =
+			"gpio20", // RX
+			"gpio21"; // TX
+		function = "blsp0_uart0";
+		drive-strength = <8>;
+		bias-disable;
+	};
+};
+
+&q6v5_wcss {
+	status = "okay";
+
+	memory-region = <&q6_mem_regions>;
+	firmware-name = "ath11k/IPQ5018/hw1.0/q6_fw.mdt",
+					"ath11k/IPQ5018/hw1.0/m3_fw.mdt",
+					"ath11k/QCN6122/hw1.0/m3_fw.mdt";
+
+	// IPQ5018
+	q6_wcss_pd1: pd-1 {
+		status = "okay";
+		
+		firmware-name = "ath11k/IPQ5018/hw1.0/q6_fw.mdt";
+
+		resets =
+			<&gcc GCC_WCSSAON_RESET>,
+			<&gcc GCC_WCSS_BCR>,
+			<&gcc GCC_CE_BCR>;
+		reset-names =
+			"wcss_aon_reset",
+			"wcss_reset",
+			"ce_reset";
+
+		clocks =
+			<&gcc GCC_WCSS_AHB_S_CLK>,
+			<&gcc GCC_WCSS_ACMT_CLK>,
+			<&gcc GCC_WCSS_AXI_M_CLK>;
+		clock-names =
+			"gcc_wcss_ahb_s_clk",
+			"gcc_wcss_acmt_clk",
+			"gcc_wcss_axi_m_clk";
+
+		// qcom,halt-regs = <&tcsr_q6_block 0xa000 0xd000 0x0>;
+		interrupts-extended =
+			<&wcss_smp2p_in 8 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 9 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 12 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 11 IRQ_TYPE_NONE>;
+		interrupt-names =
+			"fatal",
+			"ready",
+			"spawn-ack",
+			"stop-ack";
+
+		qcom,smem-states =
+			<&wcss_smp2p_out 8>,
+			<&wcss_smp2p_out 9>,
+			<&wcss_smp2p_out 10>;
+		qcom,smem-state-names =
+			"shutdown",
+			"stop",
+			"spawn";
+	};
+
+	// QCN6102 5G
+	q6_wcss_pd2: pd-2 {
+		status = "okay";
+
+		firmware-name = "ath11k/IPQ5018/hw1.0/q6_fw.mdt";
+
+		interrupts-extended =
+			<&wcss_smp2p_in 16 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 17 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 20 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 19 IRQ_TYPE_NONE>;
+		interrupt-names =
+			"fatal",
+			"ready",
+			"spawn-ack",
+			"stop-ack";
+
+		qcom,smem-states =
+			<&wcss_smp2p_out 16>,
+			<&wcss_smp2p_out 17>,
+			<&wcss_smp2p_out 18>;
+		qcom,smem-state-names =
+			"shutdown",
+			"stop",
+			"spawn";
+	};
+
+	// QCN6122 6G
+	q6_wcss_pd3: pd-3 {
+		status = "okay";
+
+		firmware-name = "ath11k/IPQ5018/hw1.0/q6_fw.mdt";
+
+		interrupts-extended =
+			<&wcss_smp2p_in 24 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 25 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 28 IRQ_TYPE_NONE>,
+			<&wcss_smp2p_in 27 IRQ_TYPE_NONE>;
+		interrupt-names =
+			"fatal",
+			"ready",
+			"spawn-ack",
+			"stop-ack";
+
+		qcom,smem-states =
+			<&wcss_smp2p_out 24>,
+			<&wcss_smp2p_out 25>,
+			<&wcss_smp2p_out 26>;
+		qcom,smem-state-names =
+			"shutdown",
+			"stop",
+			"spawn";
+	};
+};
+
+&wifi0 {
+	// IPQ5018
+	status = "okay";
+
+	qcom,rproc = <&q6_wcss_pd1>;
+	qcom,userpd-subsys-name = "q6v5_wcss_userpd1";
+	qcom,ath11k-calibration-variant = "Zyxel-SCR50AXE";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,bdf-addr = <0x4c400000>;
+};
+
+&wifi1 {
+	// QCN6102 5G
+	status = "okay";
+
+	qcom,rproc = <&q6_wcss_pd2>;
+	qcom,userpd-subsys-name = "q6v5_wcss_userpd2";
+	qcom,ath11k-calibration-variant = "Zyxel-SCR50AXE";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,bdf-addr = <0x4d100000>;
+	qcom,m3-dump-addr = <0x4de00000>;
+};
+
+&wifi2 {
+	// QCN6122 6G
+	status = "okay";
+
+	qcom,rproc = <&q6_wcss_pd3>;
+	qcom,userpd-subsys-name = "q6v5_wcss_userpd3";
+	qcom,ath11k-calibration-variant = "Zyxel-SCR50AXE-6G";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,bdf-addr = <0x4e500000>;
+	qcom,m3-dump-addr = <0x4f200000>;
+};
