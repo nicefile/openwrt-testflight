@@ -165,3 +165,21 @@ define Device/yuncore_ax830
 		ipq-wifi-yuncore_ax830
 endef
 TARGET_DEVICES += yuncore_ax830
+
+define Device/zyxel_scr50axe
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Zyxel
+	DEVICE_MODEL := SCR50AXE
+	SOC := ipq5018
+	KERNEL_IN_UBI := 1
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	NAND_SIZE := 256m
+	DEVICE_DTS_CONFIG := config@mp03.5-c1
+	DEVICE_PACKAGES := ath11k-firmware-ipq5018 \
+		ath11k-firmware-qcn6102 \
+		ath11k-firmware-qcn6122 \
+		ipq-wifi-zyxel_scr50axe
+endef
+TARGET_DEVICES += zyxel_scr50axe
