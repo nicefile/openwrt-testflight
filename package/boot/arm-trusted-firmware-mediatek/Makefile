@@ -272,6 +272,16 @@ define Trusted-Firmware-A/mt7981-cudy-ddr3
   FIP_SIZE:=0x200000
 endef
 
+define Trusted-Firmware-A/mt7981-cudy-nor-ddr3
+  NAME:=Cudy (SPI-NOR, DDR3)
+  BOOT_DEVICE:=nor
+  BUILD_SUBTARGET:=filogic
+  PLAT:=mt7981
+  DDR_TYPE:=ddr3
+  FIP_OFFSET:=0x70000
+  FIP_SIZE:=0x200000
+endef
+
 define Trusted-Firmware-A/mt7986-ram-ddr4
   NAME:=MediaTek MT7986 (RAM, DDR4)
   BOOT_DEVICE:=ram
@@ -701,6 +711,7 @@ TFA_TARGETS:= \
 	mt7981-sdmmc-ddr4 \
 	mt7981-spim-nand-ddr4 \
 	mt7981-cudy-ddr3 \
+	mt7981-cudy-nor-ddr3 \
 	mt7986-ram-ddr3 \
 	mt7986-emmc-ddr3 \
 	mt7986-nor-ddr3 \
