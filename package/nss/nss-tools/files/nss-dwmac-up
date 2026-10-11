@@ -280,24 +280,40 @@ poll_until 15 ecm_ready &&
 # 0 rules, 120k exceptions and 48 % CPU over 15 s, against 129k firmware
 # hits, 1 exception and 3 % once the session is made again (measured, same
 # image and client). So make it again with the manager resident, which is
-# what the 'ifup wan' in nss-up does on ipq807x. Only for a PPPoE WAN: no
-# other WAN type has anything to re-register.
-if [ -n "$(ls -d /sys/class/net/pppoe-* 2>/dev/null)" ]; then
-	. /lib/functions/network.sh
-	network_find_wan wan_iface
-	[ -n "$wan_iface" ] || wan_iface=wan
+# what the 'ifup wan' in nss-up does on ipq807x. Only for PPPoE: no other
+# WAN type has anything to re-register.
+#
+# Every PPPoE interface, not the one network_find_wan names: that is the
+# interface holding the default route, and a PPPoE session that does not
+# hold it (a second WAN under mwan3, a backup line, PPPoE next to a DHCP
+# uplink) stayed on the host path while an unrelated WAN was brought up
+# again in its place (reported by ADCDS on an AX3000T v2 with pppoe-wanp
+# next to a DHCP wan: no PPPoE packet in the firmware until a manual ifup).
+#
+# The manager hears of a session when pppd attaches the PPPoE channel to its
+# ppp unit, which is before authentication. So the test is whether the
+# session's netdev exists, not whether netifd calls the interface up yet.
+pppoe_ifaces=''
+for _i in $(ubus call network.interface dump 2>/dev/null |
+		jsonfilter -e '@.interface[@.proto="pppoe"].interface' 2>/dev/null); do
+	_n="$(uci -q get "network.$_i.pppname")" || _n=''
+	[ -e "/sys/class/net/${_n:-pppoe-$_i}" ] && pppoe_ifaces="$pppoe_ifaces $_i"
+done
+iface_has_addr() {
+	_d="$(ifstatus "$1" 2>/dev/null | jsonfilter -e '@.l3_device' 2>/dev/null)"
+	[ -n "$_d" ] || return 1
+	ip -4 addr show dev "$_d" 2>/dev/null | grep -q "inet "
+}
+for wan_iface in $pppoe_ifaces; do
 	ifup "$wan_iface"
-	wan_has_addr() {
-		_d="$(ifstatus "$wan_iface" 2>/dev/null | jsonfilter -e '@.l3_device' 2>/dev/null)"
-		[ -n "$_d" ] || return 1
-		ip -4 addr show dev "$_d" 2>/dev/null | grep -q "inet "
-	}
-	if poll_until 30 wan_has_addr; then
+done
+for wan_iface in $pppoe_ifaces; do
+	if poll_until 30 iface_has_addr "$wan_iface"; then
 		echo "PPPoE: $wan_iface re-created with the NSS manager resident"
 	else
-		echo "WARN: $wan_iface has no address 30s after the PPPoE re-up - WAN flows will stay on the host path"
+		echo "WARN: $wan_iface has no address 30s after the PPPoE re-up - its flows will stay on the host path"
 	fi
-fi
+done
 
 # Drop any connections tracked before ECM loaded so they re-classify
 # through the accelerated path.
