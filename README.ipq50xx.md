@@ -3,9 +3,9 @@
 This branch runs the **NSS packet-processing core of the IPQ5018** on kernel
 **6.18** with OpenWrt main's **upstream `stmmac` / `dwmac-ipq5018` ethernet
 driver** - no `qca-nss-dp`, no `qca-ssdk`. It is the IPQ50xx counterpart of the
-[IPQ807x work](/README.md) this tree is layered on: same idea (keep the upstream
-driver, attach the firmware through a small glue module), different silicon,
-different glue.
+IPQ807x work this tree is layered on ([README.md](/README.md) says where the
+tree comes from): same idea (keep the upstream driver, attach the firmware
+through a small glue module), different silicon, different glue.
 
 Validated on the **GL.iNet GL-B3000** (IPQ5018 + QCA8337 + QCN6122):
 routed NAT through the firmware at the ceiling of the single 1 GbE CPU port
@@ -29,8 +29,10 @@ Discussion and test reports: the
 
 ## What is in the branch
 
-The branch sits on Julius's `nss-edma-rework`, merged with OpenWrt main (last
-on 22 September 2026). These are the commits the work started from, in build
+The branch sits on Julius's `nss-edma-rework` at its `vendor-nss-archive` tag,
+which is OpenWrt main of 9 October 2026 with his series on top. That line is
+archived on his side and this branch carries it alone from here on; see
+[README.md](/README.md). These are the commits the work started from, in build
 order; everything since - the `dsa` topology, the boards, the fixes - builds on
 them:
 
@@ -49,8 +51,8 @@ them:
 | `qualcommax: ipq50xx: debug aids for NSS bring-up work` | `MAGIC_SYSRQ_SERIAL`, `DEVMEM` with `STRICT_DEVMEM` off. **Revert this commit for a build meant to be deployed** - it is one commit precisely so that is easy. |
 
 The companion feed is **[kuncy7/nss-packages](https://github.com/kuncy7/nss-packages/tree/ipq50xx-rebase)**,
-branch `ipq50xx-rebase`: Julius's `nss-packages` (last synced on 10 October
-2026) with the ipq50xx work on top - the 12.2 firmware line as a selectable
+branch `ipq50xx-rebase`: Julius's `nss-packages` at its `vendor-nss-archive`
+tag (10 October 2026) with the ipq50xx work on top - the 12.2 firmware line as a selectable
 version, the per-target package split that lets the stack build on ipq50xx,
 the ECM patches for DSA ports (`0051`), VLAN-aware bridges on them
 (`0052`, `0053`) and a guest network behind an access point (`0054` to
@@ -137,7 +139,7 @@ make -j$(nproc)
 `ipq50xx-rebase`). A `feeds.conf` of your own takes precedence over it, so
 if you keep one, it needs that same line. Any other NSS feed builds
 `qca-nss-ecm` without `0051`, the patch that lets ECM send a flow through a
-DSA port: Julius's `nss-packages` at the very same package version, the
+DSA port: Julius's archived `edma-nss` at the very same package version, the
 archived `ipq50xx-nss` branch of ours at an older one. That image boots,
 answers ping, and passes LAN<->LAN and Wi-Fi<->Wi-Fi traffic; every TCP flow
 between a switch port (LAN or WAN) and anything the firmware carries stalls
@@ -265,7 +267,9 @@ package unset, and gives an image whose 2.4 GHz radio does not come up
 `NSS_FIRMWARE_VERSION_12_2` selects `NSS.FW.12.2-156-MP.R` from the same
 tarball the feed already uses. It is the newest firmware published for IPQ5018
 (May 2025, nine months after 12.5) and the one every measurement in this file
-was taken on. The feed defaults to 12.5 on every target, so pick 12.2 by hand.
+was taken on. The feed defaults to it on ipq50xx since 12 October 2026; before
+that the default was 12.5 on every target, so a `.config` from an older build
+that never named a version keeps 12.5 until 12.2 is selected.
 
 - **12.5-210-MP** runs too: on a GL-B3000 it brought both radios up on the
   offload, carried routed and Wi-Fi<->LAN TCP through the firmware and came
@@ -701,7 +705,7 @@ CPU sat at 90-100 %, against 4 % with both armed. After changing it, read
 
 ## What is accelerated
 
-Legend as in the [IPQ807x README](/README.md): ✅ offloaded & validated ·
+Legend: ✅ offloaded & validated ·
 🟨 in code, not validated here · ⬜ not carried · ❌ not available.
 
 | Feature | IPQ5018 | Notes |
@@ -851,8 +855,7 @@ OOM-killed the AP daemon on a single iperf3 run. What it needed, all in the bran
     both places - the EX511 v2 and the Cudy P5 are, in both; the AX3000T v2
     is named here and in kuncy7/nss-packages#4, which is not merged yet. The
     firmware version
-  (`NSS_FIRMWARE_VERSION_12_2`) is still chosen by hand, as on every
-  ipq50xx board. `qcom,ath11k-fw-memory-mode = <2>` on both radios is in
+  (`NSS_FIRMWARE_VERSION_12_2`) is the feed's default on ipq50xx. `qcom,ath11k-fw-memory-mode = <2>` on both radios is in
   the DTS.
 
 Result: ~850 / ~740 Mbit/s on 5 GHz with 4 streams (stock: 843 / 906),
