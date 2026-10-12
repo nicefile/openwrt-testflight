@@ -1,4 +1,11 @@
-Package/ath11k-firmware-ipq5018 = $(call Package/firmware-default,IPQ5018 ath11k firmware,,LICENCE.atheros_firmware)
+# Same files as ath11k-firmware-ipq5018-qcn6122, the multi-PD 2.7.0.1 image
+# the boards that include ipq5018-qcn6122.dtsi need: this single-PD image
+# has its m3 linked outside the region that include reserves, and the
+# 2.4 GHz radio then fails with "segment outside memory range".
+define Package/ath11k-firmware-ipq5018
+$(call Package/firmware-default,IPQ5018 ath11k firmware,,LICENCE.atheros_firmware)
+  CONFLICTS:=ath11k-firmware-ipq5018-qcn6122
+endef
 define Package/ath11k-firmware-ipq5018/install
 	$(INSTALL_DIR) $(1)/lib/firmware/ath11k/IPQ5018/hw1.0
 	$(INSTALL_DATA) \
