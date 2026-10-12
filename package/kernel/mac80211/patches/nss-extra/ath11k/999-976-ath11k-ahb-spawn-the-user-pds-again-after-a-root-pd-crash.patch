@@ -1,0 +1,391 @@
+From: Stanislaw Pal <kuncy7@gmail.com>
+Subject: [PATCH] ath11k: ahb: spawn the user PDs again after a root PD crash
+
+When the radio firmware crashes, remoteproc restarts the Q6 root PD, but
+the user PDs that carry the radios are spawned by this driver, and only
+at probe. The root PD notifier handled nothing but the first power-up,
+so after a crash the root PD came back alone: the user PDs' QMI services
+never returned, the driver stayed in its crash-flush state and every WMI
+command failed with -108 until a reboot.
+
+Handle the crash in the notifier. Before the root PD is shut down, power
+the internal radio down - its user PD cannot be asked to stop any more.
+When the root PD is up again, spawn each user PD from a work item. The
+QMI service comes back with the user PD and the existing recovery takes
+over.
+
+A restart the driver itself asks for (hw-restart, a WMI timeout) crashes
+this firmware too when the user PD is told to stop, so the driver's own
+power-up and the respawn work can come for the same user PD at once, and
+the crash can fall into the middle of a spawn request. A root PD that
+restarts while a spawn bit is set spawns that user PD on its own - with
+the internal radio still powered down by the crash, which leaves that
+radio dead. So:
+
+- spawning and stopping are serialised;
+- a crash takes every spawn request back (the bit, the radio power) and
+  wakes whoever waits for it, who asks again once the root PD is up;
+- a user PD counts as up when the running instance of the root PD has
+  reported it ready, and whoever comes second then does nothing;
+- the spawn bit is cleared on every way out: left set after a timeout it
+  was no request the next time.
+
+Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
+
+--- a/drivers/net/wireless/ath/ath11k/ahb.c
++++ b/drivers/net/wireless/ath/ath11k/ahb.c
+@@ -71,6 +71,19 @@ MODULE_DEVICE_TABLE(of, ath11k_ahb_of_ma
+  */
+ static struct ath11k_ahb_rproc_info *g_rproc_info;
+ static DEFINE_MUTEX(ath11k_rproc_info_lock);
++/* userpd[], the user PD state and the root PD state against the root PD
++ * notifier, which runs under the rproc lock
++ */
++static DEFINE_SPINLOCK(ath11k_userpd_lock);
++/* One user PD is spawned or stopped at a time. After a root PD crash the
++ * respawn work and the driver's own power-up can both come for the same one.
++ */
++static DEFINE_MUTEX(ath11k_userpd_boot_lock);
++/* A spawn request (radio power, spawn bit) against a root PD crash, which
++ * takes both back: a root PD that restarts with a spawn bit set spawns that
++ * user PD on its own, with the internal radio still powered down.
++ */
++static DEFINE_MUTEX(ath11k_userpd_req_lock);
+ 
+ static const char *irq_name[ATH11K_IRQ_NUM_MAX] = {
+ 	"misc-pulse1",
+@@ -441,46 +454,135 @@ static void ath11k_ahb_stop(struct ath11
+ 	ath11k_ce_cleanup_pipes(ab);
+ }
+ 
++/* Up means the running instance of the root PD has reported it ready. A
++ * root PD that restarts with the spawn bit set spawns the user PD on its
++ * own, so who asked for it says nothing.
++ */
++static bool ath11k_ahb_user_pd_is_up(struct ath11k_ahb *ab_ahb)
++{
++	struct ath11k_ahb_rproc_info *rproc_info = ab_ahb->rproc_info;
++	bool up;
++
++	spin_lock_bh(&ath11k_userpd_lock);
++	up = rproc_info && !rproc_info->root_pd_crashed &&
++	     ab_ahb->userpd_ready_gen &&
++	     ab_ahb->userpd_ready_gen == rproc_info->root_pd_gen;
++	spin_unlock_bh(&ath11k_userpd_lock);
++
++	return up;
++}
++
+ static int ath11k_ahb_boot_user_pd(struct ath11k_base *ab)
+ {
+ 	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ab);
++	struct ath11k_ahb_rproc_info *rproc_info = ab_ahb->rproc_info;
+ 	unsigned long time_left;
+-	int ret;
++	int ret, i, tries = 0;
++	u32 crashes;
++
++	mutex_lock(&ath11k_userpd_boot_lock);
++
++retry:
++	ret = 0;
++
++	/* a root PD that crashed is back within a fraction of a second */
++	for (i = 0; rproc_info && i < 50; i++) {
++		if (!READ_ONCE(rproc_info->root_pd_crashed))
++			break;
++		msleep(100);
++	}
++
++	/* the other of the two has spawned it already */
++	if (ath11k_ahb_user_pd_is_up(ab_ahb))
++		goto unlock;
++
++	mutex_lock(&ath11k_userpd_req_lock);
++
++	if (rproc_info && rproc_info->root_pd_crashed) {
++		mutex_unlock(&ath11k_userpd_req_lock);
++		if (++tries < 3)
++			goto retry;
++		ret = -EAGAIN;
++		goto unlock;
++	}
++
++	crashes = rproc_info ? rproc_info->root_pd_crashes : 0;
++
++	reinit_completion(&ab_ahb->userpd_spawned);
++	reinit_completion(&ab_ahb->userpd_ready);
+ 
+ 	if (ab->hw_rev == ATH11K_HW_IPQ5018_HW10) {
+ 		ret = qcom_scm_pas_set_wifi_power_mode(MPD_WCNSS_PAS_ID, true);
+ 		if (ret) {
++			mutex_unlock(&ath11k_userpd_req_lock);
+ 			ath11k_err(ab, "failed to power up wifi: %d\n", ret);
+-			return ret;
++			goto unlock;
+ 		}
+ 	}
+ 
+ 	ret = qcom_smem_state_update_bits(ab_ahb->spawn_state, BIT(ab_ahb->spawn_bit),
+ 					  BIT(ab_ahb->spawn_bit));
++	mutex_unlock(&ath11k_userpd_req_lock);
+ 	if (ret) {
+ 		ath11k_err(ab, "Failed to update spawn state %d\n", ret);
+-		return ret;
++		goto unlock;
+ 	}
+ 
+ 	time_left = wait_for_completion_timeout(&ab_ahb->userpd_spawned,
+ 						ATH11K_USERPD_SPAWN_TIMEOUT);
+-	if (!time_left) {
+-		ath11k_err(ab, "UserPD spawn wait timed out\n");
+-		return -ETIMEDOUT;
++	if (time_left)
++		time_left = wait_for_completion_timeout(&ab_ahb->userpd_ready,
++							ATH11K_USERPD_READY_TIMEOUT);
++
++	/* A bit left set is no request the next time. */
++	qcom_smem_state_update_bits(ab_ahb->spawn_state, BIT(ab_ahb->spawn_bit), 0);
++
++	/* The root PD crashed under the request: the notifier took it back
++	 * and woke us. Ask again once the root PD is up.
++	 */
++	if (rproc_info && crashes != READ_ONCE(rproc_info->root_pd_crashes)) {
++		if (++tries < 3)
++			goto retry;
++		ret = -EAGAIN;
++		goto unlock;
+ 	}
+ 
+-	time_left = wait_for_completion_timeout(&ab_ahb->userpd_ready,
+-						ATH11K_USERPD_READY_TIMEOUT);
+ 	if (!time_left) {
+-		ath11k_err(ab, "UserPD ready wait timed out\n");
+-		return -ETIMEDOUT;
++		ath11k_err(ab, "UserPD spawn or ready wait timed out\n");
++		ret = -ETIMEDOUT;
++		goto unlock;
+ 	}
+ 
+-	qcom_smem_state_update_bits(ab_ahb->spawn_state, BIT(ab_ahb->spawn_bit), 0);
+-
+ 	ath11k_dbg(ab, ATH11K_DBG_AHB, "UserPD%d is now UP\n", ab_ahb->userpd_id);
+ 
+-	return 0;
++unlock:
++	mutex_unlock(&ath11k_userpd_boot_lock);
++
++	return ret;
++}
++
++/* The root PD came back after a crash. Nothing restarts its user PDs but
++ * this driver: spawn this one again. Its QMI service returns with it and
++ * the usual recovery (firmware ready, restart work, reconfigure) takes it
++ * from there.
++ */
++static void ath11k_ahb_userpd_respawn_work(struct work_struct *work)
++{
++	struct ath11k_ahb *ab_ahb = container_of(work, struct ath11k_ahb,
++						 userpd_respawn_work);
++	struct ath11k_base *ab = ab_ahb->ab;
++	int ret;
++
++	if (test_bit(ATH11K_FLAG_UNREGISTERING, &ab->dev_flags))
++		return;
++
++	ret = ath11k_ahb_boot_user_pd(ab);
++	if (ret)
++		ath11k_err(ab, "failed to boot userPD%d after the root PD restart: %d\n",
++			   ab_ahb->userpd_id, ret);
++	else
++		ath11k_info(ab, "userPD%d is up after the root PD restart\n",
++			    ab_ahb->userpd_id);
+ }
+ 
+ static int ath11k_ahb_power_up(struct ath11k_base *ab)
+@@ -504,7 +606,20 @@ static int ath11k_ahb_power_up(struct at
+ static void ath11k_ahb_stop_user_pd(struct ath11k_base *ab)
+ {
+ 	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ab);
++	struct ath11k_ahb_rproc_info *rproc_info = ab_ahb->rproc_info;
+ 	unsigned long time_left;
++	bool crashed = false;
++	u32 crashes = 0;
++
++	mutex_lock(&ath11k_userpd_boot_lock);
++
++	spin_lock_bh(&ath11k_userpd_lock);
++	if (rproc_info)
++		crashes = rproc_info->root_pd_crashes;
++	ab_ahb->userpd_ready_gen = 0;
++	spin_unlock_bh(&ath11k_userpd_lock);
++
++	reinit_completion(&ab_ahb->userpd_stopped);
+ 
+ 	qcom_smem_state_update_bits(ab_ahb->stop_state, BIT(ab_ahb->stop_bit),
+ 				    BIT(ab_ahb->stop_bit));
+@@ -516,8 +631,18 @@ static void ath11k_ahb_stop_user_pd(stru
+ 
+ 	qcom_smem_state_update_bits(ab_ahb->stop_state, BIT(ab_ahb->stop_bit), 0);
+ 
+-	if (ab->hw_rev == ATH11K_HW_IPQ5018_HW10)
++	/* If the root PD crashed meanwhile, the notifier has powered the
++	 * internal radio down, and it may be up again for the respawn.
++	 */
++	spin_lock_bh(&ath11k_userpd_lock);
++	if (rproc_info && crashes != rproc_info->root_pd_crashes)
++		crashed = true;
++	spin_unlock_bh(&ath11k_userpd_lock);
++
++	if (ab->hw_rev == ATH11K_HW_IPQ5018_HW10 && !crashed)
+ 		qcom_scm_pas_set_wifi_power_mode(MPD_WCNSS_PAS_ID, false);
++
++	mutex_unlock(&ath11k_userpd_boot_lock);
+ }
+ 
+ static void ath11k_ahb_power_down(struct ath11k_base *ab, bool is_suspend)
+@@ -1015,7 +1140,14 @@ static int ath11k_ahb_init_userpd(struct
+ 		return -EINVAL;
+ 	}
+ 
++	/* the root PD notifier completes them from here on */
++	init_completion(&ab_ahb->userpd_spawned);
++	init_completion(&ab_ahb->userpd_ready);
++	init_completion(&ab_ahb->userpd_stopped);
++	INIT_WORK(&ab_ahb->userpd_respawn_work, ath11k_ahb_userpd_respawn_work);
++	spin_lock_bh(&ath11k_userpd_lock);
+ 	g_rproc_info->userpd[userpd_id - 1] = ab_ahb;
++	spin_unlock_bh(&ath11k_userpd_lock);
+ 	g_rproc_info->num_userpd++;
+ 
+ 	return 0;
+@@ -1029,6 +1161,10 @@ static irqreturn_t ath11k_userpd_irq_han
+ 	if (irq == ab_ahb->userpd_irq_num[ATH11K_USERPD_SPAWN_IRQ]) {
+ 		complete(&ab_ahb->userpd_spawned);
+ 	} else if (irq == ab_ahb->userpd_irq_num[ATH11K_USERPD_READY_IRQ]) {
++		spin_lock_bh(&ath11k_userpd_lock);
++		if (ab_ahb->rproc_info)
++			ab_ahb->userpd_ready_gen = ab_ahb->rproc_info->root_pd_gen;
++		spin_unlock_bh(&ath11k_userpd_lock);
+ 		complete(&ab_ahb->userpd_ready);
+ 	} else if (irq == ab_ahb->userpd_irq_num[ATH11K_USERPD_STOP_ACK_IRQ])	{
+ 		complete(&ab_ahb->userpd_stopped);
+@@ -1052,8 +1188,12 @@ static void ath11k_ahb_cleanup_userpd(st
+ 
+ 	if (rproc_info && ab_ahb->userpd_id > 0 &&
+ 	    ab_ahb->userpd_id < ATH11K_AHB_USERPD_ID_MAX) {
++		spin_lock_bh(&ath11k_userpd_lock);
+ 		rproc_info->userpd[ab_ahb->userpd_id - 1] = NULL;
++		spin_unlock_bh(&ath11k_userpd_lock);
+ 		rproc_info->num_userpd--;
++		/* the notifier cannot queue it any more */
++		cancel_work_sync(&ab_ahb->userpd_respawn_work);
+ 		ab_ahb->rproc_info = NULL;
+ 	}
+ }
+@@ -1111,10 +1251,6 @@ static int ath11k_ahb_config_userpd_irq(
+ 					     ath11k_userpd_irq[i], ret);
+ 	}
+ 
+-	init_completion(&ab_ahb->userpd_spawned);
+-	init_completion(&ab_ahb->userpd_ready);
+-	init_completion(&ab_ahb->userpd_stopped);
+-
+ 	return 0;
+ }
+ 
+@@ -1123,10 +1259,66 @@ static int ath11k_ahb_root_pd_state_noti
+ {
+ 	struct ath11k_ahb_rproc_info *rproc_info =
+ 		container_of(nb, struct ath11k_ahb_rproc_info, root_pd_nb);
++	struct qcom_ssr_notify_data *notify_data = data;
++	bool int_radio = false;
++	int i;
+ 
+-	if (event == ATH11K_RPROC_AFTER_POWERUP) {
++	switch (event) {
++	case QCOM_SSR_BEFORE_SHUTDOWN:
++		if (!notify_data || !notify_data->crashed)
++			break;
++
++		/* The user PDs died with the root PD and cannot be asked to
++		 * stop. Take every spawn request back, so that the root PD
++		 * does not spawn a user PD by itself when it restarts, and
++		 * power the internal radio down before the root PD is shut
++		 * down, as its stop does. The respawn asks and powers up again.
++		 */
++		mutex_lock(&ath11k_userpd_req_lock);
++
++		spin_lock_bh(&ath11k_userpd_lock);
++		rproc_info->root_pd_crashed = true;
++		rproc_info->root_pd_crashes++;
++		for (i = 0; i < ATH11K_AHB_USERPD_ID_MAX; i++) {
++			struct ath11k_ahb *upd = rproc_info->userpd[i];
++
++			if (!upd)
++				continue;
++
++			if (upd->ab->hw_rev == ATH11K_HW_IPQ5018_HW10)
++				int_radio = true;
++
++			qcom_smem_state_update_bits(upd->spawn_state,
++						    BIT(upd->spawn_bit), 0);
++			/* whoever waits for this user PD asks again, and
++			 * a stop has nothing left to wait for
++			 */
++			complete(&upd->userpd_spawned);
++			complete(&upd->userpd_ready);
++			complete(&upd->userpd_stopped);
++		}
++		spin_unlock_bh(&ath11k_userpd_lock);
++
++		if (int_radio)
++			qcom_scm_pas_set_wifi_power_mode(MPD_WCNSS_PAS_ID, false);
++
++		mutex_unlock(&ath11k_userpd_req_lock);
++		break;
++	case ATH11K_RPROC_AFTER_POWERUP:
+ 		ath11k_dbg(NULL, ATH11K_DBG_AHB, "Root PD is UP\n");
+ 		complete(&rproc_info->rootpd_ready);
++
++		spin_lock_bh(&ath11k_userpd_lock);
++		rproc_info->root_pd_gen++;
++		if (rproc_info->root_pd_crashed) {
++			rproc_info->root_pd_crashed = false;
++			for (i = 0; i < ATH11K_AHB_USERPD_ID_MAX; i++)
++				if (rproc_info->userpd[i])
++					queue_work(system_long_wq,
++						   &rproc_info->userpd[i]->userpd_respawn_work);
++		}
++		spin_unlock_bh(&ath11k_userpd_lock);
++		break;
+ 	}
+ 
+ 	return 0;
+--- a/drivers/net/wireless/ath/ath11k/ahb.h
++++ b/drivers/net/wireless/ath/ath11k/ahb.h
+@@ -47,6 +47,12 @@ struct ath11k_ahb_rproc_info {
+ 	struct notifier_block root_pd_nb;
+ 	void *root_pd_notifier;
+ 	bool root_pd_booted;
++	/* the root PD is down in a crash, until it is up again */
++	bool root_pd_crashed;
++	/* counts the root PD crashes */
++	u32 root_pd_crashes;
++	/* counts the root PD power-ups: which instance of it is running */
++	u32 root_pd_gen;
+ 
+ 	u8 num_userpd;
+ 	struct ath11k_ahb *userpd[ATH11K_AHB_USERPD_ID_MAX];
+@@ -89,6 +95,11 @@ struct ath11k_ahb {
+ 	u32 spawn_bit;
+ 	u32 stop_bit;
+ 	int userpd_irq_num[ATH11K_USERPD_MAX_IRQ];
++	/* the root PD instance that reported this user PD ready; 0 when
++	 * it has been stopped since
++	 */
++	u32 userpd_ready_gen;
++	struct work_struct userpd_respawn_work;
+ };
+ 
+ static inline struct ath11k_ahb *ath11k_ahb_priv(struct ath11k_base *ab)
