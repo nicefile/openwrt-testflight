@@ -333,6 +333,18 @@ netdev_dw() { # netdev_dw <name> <tx> <rx> <carrier>
 netdev_dw eth0 5 6 1
 netdev_dw wan 3000 2000 1
 netdev_dw lan1 0 0 0
+netdev_dw lan2 70 80 1
+netdev_dw phy0-ap0 9 9 1
+# lan1 and lan2 are the switch ports of br-lan, next to a Wi-Fi interface. The
+# node is bound to lan1 alone; the report has to name the bridge and both ports.
+mkdir -p "$dw/sys/class/net/br-lan/brif" "$dw/sys/class/net/br-lan/bridge"
+echo 0 > "$dw/sys/class/net/br-lan/bridge/vlan_filtering"
+for p in wan lan1 lan2; do echo DEVTYPE=dsa > "$dw/sys/class/net/$p/uevent"; done
+echo DEVTYPE=wlan > "$dw/sys/class/net/phy0-ap0/uevent"
+for p in lan1 lan2 phy0-ap0; do
+	ln -s "../../$p" "$dw/sys/class/net/br-lan/brif/$p"
+	ln -s ../br-lan "$dw/sys/class/net/$p/master"
+done
 stub_dw() { printf '#!/bin/sh\n%s\n' "$2" > "$dw/bin/$1"; chmod +x "$dw/bin/$1"; }
 stub_dw ethtool 'printf "     mmc_tx_framecount_gb: 3000\n     mmc_rx_framecount_gb: 1600\n"'
 
@@ -350,15 +362,41 @@ check 'dwmac: wire totals come from the MMC, not the stmmac netdev' \
 	3000 "$(port_field "$dout" 1 tx_total)"
 check 'dwmac: offloaded RX is wire minus host' 1200 "$(port_field "$dout" 1 rx_offloaded)"
 check 'dwmac: a started port reads started' 1 "$(port_field "$dout" 1 started)"
-check 'dwmac: DSA port nodes are listed with their VID' \
+dsa_port_field() { # dsa_port_field <json> <netdev> <key>
+	printf '%s' "$1" | tr '{' '\n' | grep "\"netdev\":\"$2\"," |
+		tr ',' '\n' | sed -n "s/^\"$3\":\([^]}]*\).*/\1/p" | head -1
+}
+check 'dwmac: DSA nodes are listed with their VID' \
 	3088 "$(port_field "$dout" 31 vid)"
+check 'dwmac: a standalone port names its own node' \
+	'"wan"' "$(port_field "$dout" 30 name)"
+check 'dwmac: a bridge node is named after the bridge, not the port it is bound to' \
+	'"br-lan"' "$(port_field "$dout" 31 name)"
+check 'dwmac: a bridge node lists the switch ports of the bridge and nothing else' \
+	'"ports":["lan1","lan2"]' "$(printf '%s' "$dout" | tr '{' '\n' | grep '"ifnum":31,' | grep -o '"ports":\[[^]]*\]')"
 check 'dwmac: DSA port totals come from the port netdev' \
-	2000 "$(port_field "$dout" 30 rx_total)"
-check 'dwmac: DSA port link is the carrier' 0 "$(port_field "$dout" 31 carrier)"
+	2000 "$(dsa_port_field "$dout" wan rx_total)"
+check 'dwmac: a bridge port the node is not bound to has its totals too' \
+	80 "$(dsa_port_field "$dout" lan2 rx_total)"
+check 'dwmac: DSA port link is the carrier' 0 "$(dsa_port_field "$dout" lan1 carrier)"
 check 'dwmac: an armed dwmac mask with a frozen heartbeat reads stalled, not host' \
 	'"stalled"' "$(json_num "$dout" state)"
-check 'dwmac: the text report lists the DSA ports' \
-	2 "$(run_dw | grep -cE '^    (wan|lan1) ')"
+check 'dwmac: the text report lists the DSA nodes' \
+	2 "$(run_dw | sed -n '/DSA nodes:/,/DSA ports:/p' | grep -cE '^    (wan|br-lan) ')"
+check 'dwmac: the text report lists every DSA port once' \
+	3 "$(run_dw | sed -n '/DSA ports:/,/ECM:/p' | grep -cE '^    (wan|lan1|lan2) ')"
+# A VLAN-aware bridge has one node per VLAN, both bound to the same port.
+echo 1 > "$dw/sys/class/net/br-lan/bridge/vlan_filtering"
+{ printf "$dsa_fmt\n" wan 30 3073 1 1500 94:83:c4:de:60:ed
+  printf "$dsa_fmt\n" lan1 31 10 1 1500 94:83:c4:de:60:ef
+  printf "$dsa_fmt\n" lan1 32 99 1 1500 94:83:c4:de:60:ef
+  echo "nodes=3 resyncs=1 creates=3 destroys=0 alloc_failures=0 retries_pending=0"; } \
+	> "$dw/sys/kernel/debug/qca-dsa-nss/status"
+vout="$(run_dw -j)"
+check 'dwmac: a node of a VLAN-aware bridge is named bridge.vid' \
+	'"br-lan.10" "br-lan.99"' "$(port_field "$vout" 31 name) $(port_field "$vout" 32 name)"
+check 'dwmac: two nodes on the same ports do not list the ports twice' \
+	3 "$(printf '%s' "$vout" | tr -d '\n' | sed 's/.*"dsa_ports":\[\([^]]*\)\].*/\1/' | grep -o '"netdev":' | wc -l | tr -d ' ')"
 echo 0 > "$dwg/fw_mask"
 check 'dwmac: an empty mask printed as a bare 0 still reads as host' \
 	'"host"' "$(json_num "$(run_dw -j)" state)"

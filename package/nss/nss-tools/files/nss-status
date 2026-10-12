@@ -163,13 +163,17 @@ ports=$(echo "$ports" | while read -r ifnum nd st htx frx; do
 	}'
 done)
 
-# qca-dsa-nss: one firmware VLAN node per standalone port or VLAN-unaware
-# bridge (its ports share the bridge's tag_8021q VID), "<netdev> if_num=N vid=N
-# phys_if=N mtu=N mac=M", then a totals line. The node carries the port's
-# traffic inside the GMAC's, so the glue above has no per-port exception
-# counters; the port's wire totals come from the switch MIB behind the netdev.
-# dsa_ports: ifnum netdev vid carrier tx_total rx_total
-dsa_ports=$(awk '$2 ~ /^if_num=/ {
+# qca-dsa-nss: one firmware VLAN node per standalone port, per VLAN-unaware
+# bridge (its ports share the bridge's tag_8021q VID) and per VLAN of a
+# VLAN-aware bridge, "<netdev> if_num=N vid=N phys_if=N mtu=N mac=M", then a
+# totals line. On a bridge's line the netdev is only the port the node is
+# bound to: every switch port of the bridge uses that node, so the report
+# names the bridge (and the VLAN, when the bridge is VLAN-aware) and lists the
+# bridge's switch ports. The node carries its traffic inside the GMAC's, so the
+# glue above has no per-port exception counters; a port's wire totals come from
+# the switch MIB behind its netdev, all the port's VLANs together.
+# dsa_nodes: ifnum name vid port[,port...]
+dsa_nodes=$(awk '$2 ~ /^if_num=/ {
 	ifn = ""; vid = ""
 	for (i = 2; i <= NF; i++) {
 		split($i, kv, "=")
@@ -179,7 +183,31 @@ dsa_ports=$(awk '$2 ~ /^if_num=/ {
 	if (ifn != "") print ifn " " $1 " " vid
 }' "$DSA/status" 2>/dev/null | while read -r ifn nd vid; do
 	[ -n "$ifn" ] || continue
-	echo "$ifn $nd $vid $(cat "$NET/$nd/carrier" 2>/dev/null || echo 0)" \
+	name=$nd
+	members=$nd
+	br=$(readlink "$NET/$nd/master" 2>/dev/null)
+	br=${br##*/}
+	if [ -n "$br" ] && [ -d "$NET/$br/brif" ]; then
+		members=
+		for p in "$NET/$br/brif"/*; do
+			p=${p##*/}
+			grep -qs '^DEVTYPE=dsa$' "$NET/$p/uevent" && members="$members,$p"
+		done
+		members=${members#,}
+		[ -n "$members" ] || members=$nd
+		name=$br
+		[ "$(cat "$NET/$br/bridge/vlan_filtering" 2>/dev/null)" = 1 ] && name="$br.$vid"
+	fi
+	echo "$ifn $name $vid $members"
+done)
+# dsa_ports: netdev carrier tx_total rx_total, every port of the nodes once
+dsa_ports=$(echo "$dsa_nodes" | awk '{
+	n = split($4, m, ",")
+	for (i = 1; i <= n; i++)
+		if (!(m[i] in seen)) { seen[m[i]] = 1; print m[i] }
+}' | while read -r nd; do
+	[ -n "$nd" ] || continue
+	echo "$nd $(cat "$NET/$nd/carrier" 2>/dev/null || echo 0)" \
 	     "$(cat "$NET/$nd/statistics/tx_packets" 2>/dev/null || echo 0)" \
 	     "$(cat "$NET/$nd/statistics/rx_packets" 2>/dev/null || echo 0)"
 done)
@@ -328,18 +356,21 @@ if [ "$JSON" = 1 ]; then
 	done
 	sfjson="[${sfjson%,}]"
 
-	djson=""
-	for line in $(echo "$dsa_ports" | tr ' ' ','); do
-		# shellcheck disable=SC2046
-		set -- $(echo "$line" | tr ',' ' ')
-		[ -n "$1" ] || continue
-		djson="$djson{\"ifnum\":$1,\"netdev\":\"$2\",\"vid\":$3,\"carrier\":$4,\"tx_total\":$5,\"rx_total\":$6},"
-	done
+	dnjson=$(echo "$dsa_nodes" | while read -r ifn name vid members; do
+		[ -n "$ifn" ] || continue
+		printf '{"ifnum":%s,"name":"%s","vid":%s,"ports":["%s"]},' "$ifn" "$name" "$vid" \
+			"$(echo "$members" | sed 's/,/","/g')"
+	done)
+	dnjson="[${dnjson%,}]"
+	djson=$(echo "$dsa_ports" | while read -r nd car ttx trx; do
+		[ -n "$nd" ] || continue
+		printf '{"netdev":"%s","carrier":%s,"tx_total":%s,"rx_total":%s},' "$nd" "$car" "$ttx" "$trx"
+	done)
 	djson="[${djson%,}]"
 
 	cat <<-EOF
 	{"state":"$state","fw_version":"$fw_version","fw_mask":"$fw_mask","glue":"$GLUE_KIND",
-	"heartbeat_pps":$heartbeat,"cores":$cjson,"ports":$pjson,"dsa_ports":$djson,
+	"heartbeat_pps":$heartbeat,"cores":$cjson,"ports":$pjson,"dsa_nodes":$dnjson,"dsa_ports":$djson,
 	"ecm":{"loaded":$ecm_loaded,"ipv4_accel":$ecm_v4,"ipv6_accel":$ecm_v6,"multicast_accel":$ecm_mc},
 	"modules":{"bridge_mgr":$bridge_mgr,"pppoe":$pppoe_mgr},
 	"wifi_offload":$wifi_offload,
@@ -511,14 +542,20 @@ if [ -n "$ports" ]; then
 	echo "     short-lived flows, and traffic addressed to the router itself. A quiet"
 	echo "     port carries little else, so its share reads low. Port totals: ifconfig)"
 fi
-if [ -n "$dsa_ports" ]; then
-	echo "  DSA nodes:   one firmware node per standalone port or bridge (a bridge's"
-	echo "               ports share it, listed under one); totals from that port's MIB"
-	printf "    %-8s %4s %5s %4s %12s %12s\n" "port" "if" "vid" "link" "tx pkts" "rx pkts"
-	echo "$dsa_ports" | while read -r ifn nd vid car ttx trx; do
+if [ -n "$dsa_nodes" ]; then
+	echo "  DSA nodes:   one firmware node per standalone switch port and per bridge,"
+	echo "               one per VLAN on a VLAN-aware bridge; a bridge's ports share it"
+	printf "    %-14s %4s %5s  %s\n" "node" "if" "vid" "switch ports"
+	echo "$dsa_nodes" | while read -r ifn name vid members; do
 		[ -n "$ifn" ] || continue
+		printf "    %-14s %4s %5s  %s\n" "$name" "$ifn" "$vid" "$(echo "$members" | tr ',' ' ')"
+	done
+	echo "  DSA ports:   wire totals from the switch MIB, all VLANs of a port together"
+	printf "    %-8s %4s %12s %12s\n" "port" "link" "tx pkts" "rx pkts"
+	echo "$dsa_ports" | while read -r nd car ttx trx; do
+		[ -n "$nd" ] || continue
 		[ "$car" = 1 ] && car=up || car=down
-		printf "    %-8s %4s %5s %4s %12s %12s\n" "$nd" "$ifn" "$vid" "$car" "$ttx" "$trx"
+		printf "    %-8s %4s %12s %12s\n" "$nd" "$car" "$ttx" "$trx"
 	done
 fi
 echo "  ECM:         loaded=$ecm_loaded, accelerated: $ecm_v4 IPv4 / $ecm_v6 IPv6 / $ecm_mc multicast"
