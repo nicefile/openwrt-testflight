@@ -1,0 +1,31 @@
+From: Stanislaw Pal <kuncy7@gmail.com>
+Subject: [PATCH] arm64: dts: qcom: ipq5018: ack SMP2P restarts of the WCSS
+
+Without qcom,smp2p-feature-ssr-ack the Q6 starts once per boot. Any
+later start - after a firmware crash, or after the ath11k driver was
+unbound and bound again - ends in
+
+  qcom-wcss-secure-pil cd00000.remoteproc: start timed out
+  remoteproc remoteproc0: can't start rproc q6wcss: -110
+
+The Q6 does come up: the smp2p interrupt fires during the attempt, but
+"ready" never follows, because the firmware waits for the host to
+acknowledge the restart. The vendor device tree for the IPQ5018 has the
+property, as the IPQ6018 has here since "soc: qcom: fix smp2p ack on
+ipq6018", which describes the same failure.
+
+On an Archer AX55 v1 with it the Q6 is up again 0.1 s after an unbind
+and bind, and 0.2 s after a firmware crash.
+
+Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
+
+--- a/arch/arm64/boot/dts/qcom/ipq5018.dtsi
++++ b/arch/arm64/boot/dts/qcom/ipq5018.dtsi
+@@ -1217,6 +1217,7 @@
+ 
+ 		wcss_smp2p_out: master-kernel {
+ 			qcom,entry-name = "master-kernel";
++			qcom,smp2p-feature-ssr-ack;
+ 			#qcom,smem-state-cells = <1>;
+ 		};
+ 
