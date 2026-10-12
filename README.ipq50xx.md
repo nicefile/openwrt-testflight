@@ -613,9 +613,9 @@ The board side is small. The parts, in order of effort:
    first boot. Anything else logs a line telling you to set them by hand.
 
    The `dsa` topology needs no table entry. Besides the GL-B3000 it has run
-   at testers' on the Linksys MX2000 and MR5500, the Xiaomi AX6000, the
-   Zyxel SCR50AXE, the Redmi AX5400, the Cudy P5 and the TP-Link Archer AX55
-   v1.
+   at testers' on the Linksys MX2000, MR5500 and MX5500, the Xiaomi AX6000,
+   the Zyxel SCR50AXE, the Redmi AX5400, the Cudy P5 and the TP-Link Archer
+   AX55 v1.
 
    The table applies once, on a config that has no `nss.general.topology`
    yet; a sysupgrade that keeps settings keeps the old layout. An AX5400

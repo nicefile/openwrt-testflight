@@ -1,0 +1,40 @@
+From: Stanislaw Pal <kuncy7@gmail.com>
+Subject: [PATCH] ath11k: ask mac80211 for unique station addresses on a radio
+
+When a station turns up on a second BSS of a radio while the first BSS
+still has it, hostapd tells the first BSS to drop it, but the old entry
+leaves the kernel only when the status of the deauth frame is back, and
+the new entry is added at once. ath11k_peer_create() takes the old peer
+out of its hash, "expecting a disassoc soon", and sends the firmware a
+peer create for an address it still holds a peer for on another vdev.
+The IPQ5018 firmware (WLAN.HK.2.7.0.1) does not take that, on the
+internal radio or on the QCN6122:
+
+  ar_wal_peer.c:2899 Assertion is_graceful_to_handle failed
+  remoteproc remoteproc0: crash detected in q6wcss: type fatal error
+
+and the Q6 does not come back, so the radio is gone until a reboot - on
+a board whose QCN6122 shares the Q6, both radios. A client that
+deauthenticates before it changes the SSID never gets there; one that
+just reappears on the other SSID does, the first time it tries.
+
+Set IEEE80211_HW_NEEDS_UNIQUE_STA_ADDR, so that mac80211 does not let a
+second entry for an address exist on the radio; with the mac80211 patch
+that goes with this one it takes the old entry out, peer and all, before
+the new one goes in. The hardware is registered per radio, so a station
+moving to the other band is not affected.
+
+Reported-by: kflush (OpenWrt forum)
+Link: https://forum.openwrt.org/t/ipq5018-nss-offload-on-kernel-6-18-with-the-upstream-ethernet-stack-gl-b3000/253014/660
+Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
+
+--- a/drivers/net/wireless/ath/ath11k/mac.c
++++ b/drivers/net/wireless/ath/ath11k/mac.c
+@@ -11144,6 +11144,7 @@ static int __ath11k_mac_register(struct ath11k *ar)
+ 	ieee80211_hw_set(ar->hw, SUPPORTS_TX_FRAG);
+ 	ieee80211_hw_set(ar->hw, REPORTS_LOW_ACK);
+ 	ieee80211_hw_set(ar->hw, HAS_TX_QUEUE);
++	ieee80211_hw_set(ar->hw, NEEDS_UNIQUE_STA_ADDR);
+ 
+ 	if (ath11k_frame_mode == ATH11K_HW_TXRX_ETHERNET) {
+ 		ieee80211_hw_set(ar->hw, SUPPORTS_TX_ENCAP_OFFLOAD);

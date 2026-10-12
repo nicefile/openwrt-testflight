@@ -54,7 +54,7 @@ NSS_PATCH:=subsys ath11k
 # patches/nss/ yet. A directory of its own, applied after the whole of
 # patches/nss/, which stays a verbatim copy of what mac80211-nss-staging
 # exports (its export tool wipes those directories).
-NSS_EXTRA_PATCH:=ath11k
+NSS_EXTRA_PATCH:=subsys ath11k
 
 define KernelPackage/mac80211/Default
   SUBMENU:=$(WMENU)
