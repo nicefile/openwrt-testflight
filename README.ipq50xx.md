@@ -93,7 +93,10 @@ NSS memory profiles are a build-time choice for the whole image:
 
 The exact configuration of each group is in `.github/ci/ipq50xx/` (`common.config`
 + `<group>.config` + `kmods-extra.config`) and, for a given release, in the
-attached `config-<group>.buildinfo`.
+attached `config-<group>.buildinfo`. `feeds-<group>.buildinfo` next to it names
+the commit of every feed the build used. `feeds.conf.default` follows the nss
+feed by branch, so the tag of this tree alone does not pin the feed; to rebuild
+a release, put those lines into `feeds.conf`.
 
 ### Kernel modules that are not in the image
 

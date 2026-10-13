@@ -287,9 +287,14 @@ jobs:
           mapfile -t assets < <(find "$out" -maxdepth 1 -type f \( "${names[@]}" \))
           grep -E "$sums" "$out/sha256sums" >"sha256sums-${GROUP}.txt"
           cp "$out/config.buildinfo" "config-${GROUP}.buildinfo"
+          # The feed commits this build used. feeds.conf.default names the nss feed by branch,
+          # so the tag of this tree alone does not say which feed code is in the images.
+          ./scripts/feeds list -fs >"feeds-${GROUP}.buildinfo"
+          cat "feeds-${GROUP}.buildinfo"
           for attempt in 1 2 3; do
             gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-              "${assets[@]}" "sha256sums-${GROUP}.txt" "config-${GROUP}.buildinfo" "diffconfig-${GROUP}.txt" && break
+              "${assets[@]}" "sha256sums-${GROUP}.txt" "config-${GROUP}.buildinfo" \
+              "feeds-${GROUP}.buildinfo" "diffconfig-${GROUP}.txt" && break
             [[ $attempt -lt 3 ]] || { echo "::error::upload failed after $attempt attempts"; exit 1; }
             sleep 15
           done
