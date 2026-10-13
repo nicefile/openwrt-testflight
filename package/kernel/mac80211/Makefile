@@ -459,10 +459,18 @@ endef
 
 
 ifdef CONFIG_ATH11K_NSS_SUPPORT
+# Two flavours of the pool tuning, like the two 'nss' services. ipq50xx has
+# the values and the sequence measured on IPQ5018 boards, where nss-dwmac-up
+# runs the script once the core is up. ipq807x and ipq60xx keep the script
+# of the EDMA-NSS tree as it was: its 'nss' service runs it before the
+# radios bind and counts on it to pin the NSS clock and to leave a Wi-Fi
+# that is already up alone.
+NSS_PBUF_FLAVOUR:=$(if $(CONFIG_TARGET_qualcommax_ipq50xx),,-ppe)
+
 define KernelPackage/ath11k/install
 	$(INSTALL_DIR) $(1)/etc/init.d $(1)/etc/config $(1)/usr/bin
-	$(INSTALL_BIN) ./files/qca-nss-pbuf.init $(1)/etc/init.d/qca-nss-pbuf
-	$(INSTALL_DATA) ./files/pbuf.uci $(1)/etc/config/pbuf
+	$(INSTALL_BIN) ./files/qca-nss-pbuf$(NSS_PBUF_FLAVOUR).init $(1)/etc/init.d/qca-nss-pbuf
+	$(INSTALL_DATA) ./files/pbuf$(NSS_PBUF_FLAVOUR).uci $(1)/etc/config/pbuf
 	$(INSTALL_BIN) ./files/nss_diag.sh $(1)/usr/bin/nss_diag
 endef
 endif

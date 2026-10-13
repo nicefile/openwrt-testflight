@@ -1,0 +1,14 @@
+config general opt
+  # NSS frequency scaling. The NSS cores of IPQ807x have three steps (187,
+  # 749 and 1690 MHz) and the driver moves between them with the load. Set
+  # to 'off' to pin the cores to the top step instead.
+  option auto_scale 'on'
+  # option memory_profile 'off'
+  option memory_profile 'auto'
+  # option memory_profile '1gb'
+  # option memory_profile '512mb'
+  # option memory_profile '256mb'
+  # ath11k per-peer statistics (station RSSI / tx rate in LuCI and iw).
+  # Keeping them enabled costs a little host CPU per PPDU; set to '1' to
+  # trade the station statistics away on a heavily loaded AP.
+  option stats_disable '0'

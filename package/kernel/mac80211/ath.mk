@@ -24,6 +24,7 @@ PKG_CONFIG_DEPENDS += \
 	CONFIG_ATH11K_MEM_PROFILE_256M \
 	CONFIG_ATH11K_NSS_MEM_PROFILE_256M \
 	CONFIG_PACKAGE_nss-tools-dwmac \
+	CONFIG_PACKAGE_nss-tools \
 	CONFIG_ATH11K_DEBUGFS_STA \
 	CONFIG_ATH11K_DEBUGFS_HTT_STATS
 
@@ -347,6 +348,7 @@ define KernelPackage/ath11k
   # recursive-dependency cycle through mac80211.
   FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k.ko
 ifdef CONFIG_ATH11K_NSS_SUPPORT
+ifeq ($(CONFIG_TARGET_qualcommax_ipq50xx),y)
 # ipq50xx: the 'nss' service of nss-tools-dwmac loads ath11k itself, after
 # the firmware plane is armed. Autoloading it here means kmodloader probes
 # the radios with nss_offload=1 about fourteen seconds before the core is
@@ -356,7 +358,6 @@ ifdef CONFIG_ATH11K_NSS_SUPPORT
 # rmmod to recover with. Reported by @danpawlik on the forum.
 ifneq ($(CONFIG_PACKAGE_nss-tools-dwmac),y)
   AUTOLOAD:=$(call AutoProbe,ath11k)
-ifeq ($(CONFIG_TARGET_qualcommax_ipq50xx),y)
 # ipq50xx without the service: the NSS core only comes up when the service
 # arms a GMAC, so nothing ever enables it here. With nss_offload=1 anyway,
 # ath11k_nss_setup() logs "NSS offload support disabled, falling back to
@@ -364,9 +365,13 @@ ifeq ($(CONFIG_TARGET_qualcommax_ipq50xx),y)
 # "failed to create pdev core: -524", no radios at all (measured on a TP-Link
 # Archer AX55 v1 image built without nss-tools-dwmac). Load them on the host.
   MODPARAMS.ath11k:=nss_offload=0 frame_mode=2
-else
-  MODPARAMS.ath11k:=nss_offload=1 frame_mode=2
 endif
+else
+  # ath11k needs its own modules.d entry so frame_mode reaches the module at
+  # boot; NSS offload itself stays opt-in (nss_offload defaults to 0, and the
+  # 'nss' service of nss-tools sets it before it loads the bus drivers).
+  AUTOLOAD:=$(call AutoProbe,ath11k)
+  MODPARAMS.ath11k:=frame_mode=2
 endif
 endif
 endef
@@ -503,8 +508,11 @@ define KernelPackage/ath11k-ahb
   URL:=https://wireless.wiki.kernel.org/en/users/drivers/ath11k
   DEPENDS+= @TARGET_qualcommax +kmod-ath11k +kmod-qrtr-smd
   FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k_ahb.ko
-# Loaded by the 'nss' service on ipq50xx, not at boot - see kmod-ath11k.
-ifneq ($(CONFIG_PACKAGE_nss-tools-dwmac),y)
+# Where an 'nss' service is in the image it loads the bus drivers, not
+# kmodloader: nss-tools-dwmac on ipq50xx after the arm (see kmod-ath11k),
+# nss-tools on ipq807x and ipq60xx once it has armed the data plane and set
+# nss_offload, so that the radios bind once and on the right path.
+ifeq ($(filter y,$(CONFIG_PACKAGE_nss-tools-dwmac) $(CONFIG_PACKAGE_nss-tools)),)
   AUTOLOAD:=$(call AutoProbe,ath11k_ahb)
 endif
 endef
@@ -520,12 +528,12 @@ define KernelPackage/ath11k-pci
   URL:=https://wireless.wiki.kernel.org/en/users/drivers/ath11k
   DEPENDS+= @PCI_SUPPORT +kmod-qrtr-mhi +kmod-ath11k
   FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k_pci.ko
-# Same as kmod-ath11k-ahb: on ipq50xx the 'nss' service loads the bus driver
-# after the arm. Autoloading it here probes the radio while nss_offload is
-# still 0, and ath11k_base takes its nss.enabled from the parameter at probe
-# time - so the PCIe radio silently comes up on the host path and never
-# registers a wifili interface, whatever the service sets afterwards.
-ifneq ($(CONFIG_PACKAGE_nss-tools-dwmac),y)
+# Same as kmod-ath11k-ahb: an 'nss' service loads the bus driver after the
+# arm. Autoloading it here probes the radio while nss_offload is still 0,
+# and ath11k_base takes its nss.enabled from the parameter at probe time -
+# so the PCIe radio silently comes up on the host path and never registers
+# a wifili interface, whatever the service sets afterwards.
+ifeq ($(filter y,$(CONFIG_PACKAGE_nss-tools-dwmac) $(CONFIG_PACKAGE_nss-tools)),)
   AUTOLOAD:=$(call AutoProbe,ath11k_pci)
 endif
 endef
