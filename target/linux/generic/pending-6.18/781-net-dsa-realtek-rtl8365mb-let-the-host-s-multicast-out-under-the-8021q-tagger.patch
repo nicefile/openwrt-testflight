@@ -1,0 +1,108 @@
+From: Stanislaw Pal <kuncy7@gmail.com>
+Date: Wed, 14 Oct 2026 19:45:00 +0200
+Subject: [PATCH] net: dsa: realtek: rtl8365mb: let the host's multicast out
+ under the 802.1Q tagger
+
+With FDB isolation and MDB support the DSA core turns the multicast list
+of a standalone port, and of a bridge, into host MDB entries: L2 entries
+whose only member is the CPU port. The Realtek tag of rtl8_4 forces the
+egress port of a frame from the host, so those entries never meet the
+host's own frames. The 802.1Q tagger forces nothing: the switch looks
+the DA of a frame from the host up like any other, finds the entry of a
+group the host is in and, the CPU being the source port, drops the
+frame.
+
+On a TP-Link Archer AX55 that took out ff02::1 and ff02::2 on the WAN
+port, and with them the router solicitations odhcpd relays upstream, and
+the neighbour solicitations for every address whose solicited-node group
+the host had joined too (the gateway's ::1, the addresses relayed by
+NDP proxy). Groups the host is not in were flooded and went out.
+
+Give an entry of the host the user ports of its database as members as
+well: the standalone port, or the ports of the bridge. Traffic arriving
+on those ports still goes to the CPU, and the host's frames leave
+through the ports they were sent to. Deleting the entry of the host
+clears those ports again, which also clears them from a snooped entry
+of one of those ports for the same group and VID; the bridge puts them
+back with the next report.
+
+Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
+---
+--- a/drivers/net/dsa/realtek/rtl8365mb_main.c
++++ b/drivers/net/dsa/realtek/rtl8365mb_main.c
+@@ -4181,15 +4181,59 @@
+ 				    rtl8365mb_db_vid(ds->priv, db, vid), db);
+ }
+ 
++/* Under the 802.1Q tagger nothing in a frame from the host steers it to a
++ * port: the switch looks its DA up like that of any other frame. A host MDB
++ * entry, which only has the CPU port as member, then catches the host's own
++ * multicast to that group - ff02::1, ff02::2, the solicited-node groups of
++ * its addresses - and the frame dies on its source port. So an entry of the
++ * host also gets the user ports of its database as members: the standalone
++ * port, or the ports of the bridge. Traffic coming in on those ports still
++ * reaches the CPU, and the host's frames leave where they are meant to.
++ */
++static int rtl8365mb_port_mdb_host_ports(struct dsa_switch *ds, int port,
++					 const struct switchdev_obj_port_mdb *m,
++					 struct dsa_db db, bool add)
++{
++	struct dsa_port *dp;
++	int ret;
++
++	if (!rtl8365mb_is_8021q(ds->priv) || !dsa_is_cpu_port(ds, port))
++		return 0;
++
++	dsa_switch_for_each_user_port(dp, ds) {
++		if (db.type == DSA_DB_PORT && dp != db.dp)
++			continue;
++		if (db.type == DSA_DB_BRIDGE &&
++		    !dsa_port_offloads_bridge_dev(dp, db.bridge.dev))
++			continue;
++		if (db.type != DSA_DB_PORT && db.type != DSA_DB_BRIDGE)
++			continue;
++
++		if (add)
++			ret = rtl83xx_port_mdb_add(ds, dp->index, m, db);
++		else
++			ret = rtl83xx_port_mdb_del(ds, dp->index, m, db);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
+ static int rtl8365mb_port_mdb_add(struct dsa_switch *ds, int port,
+ 				  const struct switchdev_obj_port_mdb *mdb,
+ 				  struct dsa_db db)
+ {
+ 	struct switchdev_obj_port_mdb m = *mdb;
++	int ret;
+ 
+ 	m.vid = rtl8365mb_db_vid(ds->priv, db, mdb->vid);
+ 
+-	return rtl83xx_port_mdb_add(ds, port, &m, db);
++	ret = rtl83xx_port_mdb_add(ds, port, &m, db);
++	if (ret)
++		return ret;
++
++	return rtl8365mb_port_mdb_host_ports(ds, port, &m, db, true);
+ }
+ 
+ static int rtl8365mb_port_mdb_del(struct dsa_switch *ds, int port,
+@@ -4197,9 +4241,14 @@
+ 				  struct dsa_db db)
+ {
+ 	struct switchdev_obj_port_mdb m = *mdb;
++	int ret;
+ 
+ 	m.vid = rtl8365mb_db_vid(ds->priv, db, mdb->vid);
+ 
++	ret = rtl8365mb_port_mdb_host_ports(ds, port, &m, db, false);
++	if (ret)
++		return ret;
++
+ 	return rtl83xx_port_mdb_del(ds, port, &m, db);
+ }
+ 
