@@ -41,6 +41,19 @@ define Download/$(ATH11K_LEGACY_FW_NAME)
 endef
 $(eval $(call Download,$(ATH11K_LEGACY_FW_NAME)))
 
+# WLAN.HK.2.12-01460 for IPQ8074, the line the qosmio NSS images ship.
+# Neither linux-firmware (2.9.0.1) nor the CodeLinaro tree carries it; the
+# archive is the one of the EDMA-NSS source tarballs, mirrored with them.
+ATH11K_IPQ8074_212_NAME:=ath11k-firmware-ipq8074-2.12
+ATH11K_IPQ8074_212_SOURCE:=ath11k-firmware-ipq8074-2.12-01460.tar.zst
+
+define Download/$(ATH11K_IPQ8074_212_NAME)
+	FILE:=$(ATH11K_IPQ8074_212_SOURCE)
+	URL:=https://github.com/kuncy7/nss-packages/releases/download/nss-source-tarballs
+	HASH:=b4241d7fd93dd632c4100ff1088670881e131674fbe650e5bc2f9fd636a027ea
+endef
+$(eval $(call Download,$(ATH11K_IPQ8074_212_NAME)))
+
 define Package/ath11k-firmware-default
   SECTION:=firmware
   CATEGORY:=Firmware
@@ -58,17 +71,33 @@ $(Package/ath11k-firmware-default)
   TITLE:=IPQ6018 ath11k firmware
 endef
 
+define Package/ath11k-firmware-ipq8074-2.12
+$(Package/ath11k-firmware-default)
+  TITLE:=IPQ8074 ath11k firmware 2.12
+  URL:=https://github.com/kuncy7/nss-packages/releases/tag/nss-source-tarballs
+  CONFLICTS:=ath11k-firmware-ipq8074
+endef
+
+define Package/ath11k-firmware-ipq8074-2.12/description
+WLAN.HK.2.12-01460 for the IPQ8074 radios, in place of the 2.9.0.1 image
+of ath11k-firmware-ipq8074. Same files and the same location; the board
+data still comes from the device's ipq-wifi package.
+endef
+
 define Build/Clean
 	$(call Build/Clean/Default,)
 
 	rm -rf \
-		$(BUILD_DIR)/$(ATH11K_LEGACY_FW_SUBDIR)
+		$(BUILD_DIR)/$(ATH11K_LEGACY_FW_SUBDIR) \
+		$(BUILD_DIR)/$(ATH11K_IPQ8074_212_NAME)
 endef
 
 define Build/Prepare
 	$(call Build/Prepare/Default,)
 
 	$(TAR) -C $(BUILD_DIR) -xf $(DL_DIR)/$(ATH11K_LEGACY_FW_SOURCE)
+	mkdir -p $(BUILD_DIR)/$(ATH11K_IPQ8074_212_NAME)
+	$(TAR) -C $(BUILD_DIR)/$(ATH11K_IPQ8074_212_NAME) -xf $(DL_DIR)/$(ATH11K_IPQ8074_212_SOURCE)
 endef
 
 define Build/Compile
@@ -97,4 +126,14 @@ define Package/ath11k-firmware-ipq6018/install
 endef
 
 $(eval $(call BuildPackage,ath11k-firmware-ipq5018-qcn6122))
+define Package/ath11k-firmware-ipq8074-2.12/install
+	$(INSTALL_DIR) $(1)/lib/firmware/IPQ8074
+	$(INSTALL_DATA) \
+		$(BUILD_DIR)/$(ATH11K_IPQ8074_212_NAME)/IPQ8074/fw_version.txt \
+		$(BUILD_DIR)/$(ATH11K_IPQ8074_212_NAME)/IPQ8074/m3_fw.* \
+		$(BUILD_DIR)/$(ATH11K_IPQ8074_212_NAME)/IPQ8074/q6_fw.* \
+		$(1)/lib/firmware/IPQ8074/
+endef
+
 $(eval $(call BuildPackage,ath11k-firmware-ipq6018))
+$(eval $(call BuildPackage,ath11k-firmware-ipq8074-2.12))
