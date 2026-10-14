@@ -43,9 +43,18 @@ define Package/nss-tools-dwmac
   SECTION:=net
   CATEGORY:=Network
   TITLE:=NSS offload runtime for ipq50xx (qca-dwmac-nss glue)
-  DEPENDS:=@(TARGET_qualcommax_ipq50xx) +kmod-qca-dwmac-nss +kmod-qca-nss-drv \
-	+kmod-qca-nss-ecm +kmod-qca-nss-drv-vlan-mgr +kmod-qca8337-nss \
-	+kmod-rtl8367s-nss +kmod-qca-dsa-nss +ip-full
+  # The ipq50xx kernel modules are conditional although the package itself
+  # is ipq50xx-only: nss-tools and this package share one source package,
+  # and the build dependencies of a source package are the union of its
+  # packages' dependencies. Unconditional, they made an IPQ807x image that
+  # selects nss-tools compile the ipq50xx glue as well, which cannot link
+  # there.
+  DEPENDS:=@(TARGET_qualcommax_ipq50xx) \
+	+TARGET_qualcommax_ipq50xx:kmod-qca-dwmac-nss +kmod-qca-nss-drv \
+	+kmod-qca-nss-ecm +kmod-qca-nss-drv-vlan-mgr \
+	+TARGET_qualcommax_ipq50xx:kmod-qca8337-nss \
+	+TARGET_qualcommax_ipq50xx:kmod-rtl8367s-nss \
+	+TARGET_qualcommax_ipq50xx:kmod-qca-dsa-nss +ip-full
   CONFLICTS:=nss-tools
   PKGARCH:=all
 endef
