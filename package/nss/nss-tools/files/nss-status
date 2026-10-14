@@ -228,7 +228,8 @@ pppoe_mgr=$(mod qca_nss_pppoe)
 wifi_offload=$(cat "$MOD/ath11k/parameters/nss_offload" 2>/dev/null || echo -1)
 # Firmware memory mode per radio, straight off the live device tree. Mode 2 is
 # what a QCN6122 on a GL-B3000 was measured to need; boards running wifili on
-# mode 1 exist, so this is reported, not enforced.
+# mode 1 exist, so this is reported, not enforced. The output names the mode
+# only: a board-specific note there reads as a warning on every other board.
 fw_mem_modes=
 for f in /sys/firmware/devicetree/base/soc*/wifi*/qcom,ath11k-fw-memory-mode; do
 	[ -e "$f" ] || continue
@@ -577,7 +578,7 @@ case "$wifi_offload" in
 	    fi ;;
 	*)  echo "  Wi-Fi:       ath11k not loaded" ;;
 esac
-[ -n "$fw_mem_modes" ] && echo "  fw mem mode:$fw_mem_modes (from the device tree; 2 is what a QCN6122 on a GL-B3000 needed, 1 is measured working elsewhere)"
+[ -n "$fw_mem_modes" ] && echo "  fw mem mode:$fw_mem_modes (from the device tree)"
 if [ "$sqm_active" = 1 ]; then
 	igs_human=$(echo "$igs_ports" | sed 's/\([a-z0-9]*\):1/\1/g; s/\([a-z0-9]*\):0/\1(MISSING)/g')
 	if [ "$sqm_lanes" = 1 ]; then
