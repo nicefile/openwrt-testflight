@@ -4,7 +4,6 @@
 /dts-v1/;
 
 #include "ipq8074.dtsi"
-#include "ipq8074-nss.dtsi"
 #include "ipq8074-hk-cpu.dtsi"
 #include "ipq8074-ess.dtsi"
 #include <dt-bindings/gpio/gpio.h>
@@ -585,7 +584,7 @@
 				reg = <0>;
 				label = "cpu";
 				ethernet = <&port_switch>;
-				dsa-tag-protocol = "qca-8021q";
+				dsa-tag-protocol = "qca-etype";
 				phy-mode = "rgmii-rxid";
 				phy-handle = <&qca8035>;
 			};
