@@ -432,18 +432,20 @@ define KernelPackage/ath11k/config
                   host-only data path retain their existing allocations.
 
        config ATH11K_NSS_MESH_SUPPORT
-               bool "Enable NSS 802.11s mesh offload (requires 11.4 firmware)"
+               bool "Enable NSS 802.11s mesh offload"
                depends on ATH11K_NSS_SUPPORT
-               # Hard requirement: every published NSS firmware newer than
-               # 11.4 rejects mesh interfaces at the firmware level (the
+               # On IPQ807x and IPQ60xx every published NSS firmware newer
+               # than 11.4 rejects mesh interfaces at the firmware level (the
                # capability probe reports no mesh support, and forcing past
                # it gets the mesh-manager interface create NACKed - verified
-               # on 12.5-210 with both memory profiles). Mesh offload only
-               # works on the 11.4 firmware line.
+               # on 12.5-210 with both memory profiles), so there mesh offload
+               # needs the 11.4 firmware line. The IPQ5018 firmware 12.2 and
+               # 12.5 answer the capability probe and create the mesh manager
+               # (measured on a GL-B3000 and an Archer AX55, SAE included).
                # 'depends on' rather than 'select' because
                # NSS_FIRMWARE_VERSION_11_4 is a choice member and selecting
                # into a choice is unreliable.
-               depends on NSS_FIRMWARE_VERSION_11_4
+               depends on NSS_FIRMWARE_VERSION_11_4 || TARGET_qualcommax_ipq50xx
                # Same recursion constraint as ATH11K_NSS_SUPPORT above: the
                # meshmgr module pull lives on kmod-mac80211's DEPENDS
                # ('+ATH11K_NSS_MESH_SUPPORT:kmod-qca-nss-drv-wifi-meshmgr'),
@@ -455,10 +457,12 @@ define KernelPackage/ath11k/config
                help
                   Say Y to offload 802.11s mesh forwarding (mesh path and
                   proxy path tables) to the NSS cores via the Wi-Fi mesh
-                  manager. Only available with NSS firmware 11.4, the last
-                  firmware line that supports mesh; on newer firmware
-                  802.11s works on the host path only. Mesh interfaces use
-                  the NSS path only when the radio runs with nss_offload=1.
+                  manager. On IPQ807x and IPQ60xx this needs NSS firmware
+                  11.4; on IPQ5018 the 12.2 and 12.5 firmware support it.
+                  Without it 802.11s works on the host path only. Mesh
+                  interfaces use the NSS path only when the radio runs with
+                  nss_offload=1. An encrypted (SAE) mesh needs a supplicant
+                  built with mesh support (wpad-mesh-* or full wpad).
 
        config ATH11K_DEBUGFS_STA
                bool "Enable ath11k station statistics"
