@@ -53,7 +53,8 @@ NSS_PATCH:=subsys ath11k
 # the wifili bring-up, the 256 MiB NSS profile and the fixes that are not in
 # patches/nss/ yet. A directory of its own, applied after the whole of
 # patches/nss/, which stays a verbatim copy of what mac80211-nss-staging
-# exports (its export tool wipes those directories).
+# exports (its export tool wipes those directories). nss-extra/mesh goes
+# with patches/nss/mesh: only with CONFIG_ATH11K_NSS_MESH_SUPPORT.
 NSS_EXTRA_PATCH:=subsys ath11k
 
 define KernelPackage/mac80211/Default
@@ -407,6 +408,9 @@ endif
 	$(foreach driver,$(NSS_EXTRA_PATCH),
 		$(call PatchDir,$(PKG_BUILD_DIR),$(PATCH_DIR)/nss-extra/$(driver),nss-extra/$(driver)/)
 	)
+ifdef CONFIG_ATH11K_NSS_MESH_SUPPORT
+	$(call PatchDir,$(PKG_BUILD_DIR),$(PATCH_DIR)/nss-extra/mesh,nss-extra/mesh/)
+endif
 endif
 	$(if $(QUILT),touch $(PKG_BUILD_DIR)/.quilt_used)
 endef
@@ -435,6 +439,9 @@ endif
 	$(foreach driver,$(NSS_EXTRA_PATCH),
 		$(call Quilt/RefreshDir,$(PKG_BUILD_DIR),$(PATCH_DIR)/nss-extra/$(driver),nss-extra/$(driver)/)
 	)
+ifdef CONFIG_ATH11K_NSS_MESH_SUPPORT
+	$(call Quilt/RefreshDir,$(PKG_BUILD_DIR),$(PATCH_DIR)/nss-extra/mesh,nss-extra/mesh/)
+endif
 endif
 endef
 
