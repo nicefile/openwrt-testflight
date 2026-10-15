@@ -251,12 +251,17 @@ jobs:
           CCACHE_DIR="$PWD/.ccache" staging_dir/host/bin/ccache -s || true
           df -h / | tail -1
 
-      - name: Add luci-app-nss to the build's repository
+      - name: Add luci-app-nss and wpad-mesh-mbedtls to the build's repository
         run: |
           set -euo pipefail
-          # PKGARCH all lands in the base feed directory, which is not published; the image lists
-          # only this build's target repository and the official feeds, which do not carry it.
+          # The base feed directory is not published; the image lists only this build's target
+          # repository and the official feeds. luci-app-nss is not in the official feeds at all,
+          # and their wpad-mesh-mbedtls lacks this tree's hostapd patches (the mesh peering after
+          # a radio firmware restart) - README tells std users to install it from here.
           cp bin/packages/*/base/luci-app-nss-*.apk "bin/targets/${TARGET}/packages/"
+          if grep -q '^CONFIG_PACKAGE_wpad-mesh-mbedtls=[my]' .config; then
+            cp bin/packages/*/base/wpad-mesh-mbedtls-*.apk "bin/targets/${TARGET}/packages/"
+          fi
           make package/index
 
       - name: Check the output
@@ -272,6 +277,10 @@ jobs:
             || { echo "::error::kmod-wireguard missing from the repository"; exit 1; }
           compgen -G "$out/packages/luci-app-nss-*.apk" >/dev/null \
             || { echo "::error::luci-app-nss missing from the repository"; exit 1; }
+          if grep -q '^CONFIG_PACKAGE_wpad-mesh-mbedtls=[my]' .config; then
+            compgen -G "$out/packages/wpad-mesh-mbedtls-*.apk" >/dev/null \
+              || { echo "::error::wpad-mesh-mbedtls missing from the repository"; exit 1; }
+          fi
           kernel=$(find "$out/packages" -maxdepth 1 -name 'kernel-*.apk' -printf '%f\n')
           echo "repository: $(find "$out/packages" -maxdepth 1 -name '*.apk' | wc -l) packages, ${kernel}"
 
