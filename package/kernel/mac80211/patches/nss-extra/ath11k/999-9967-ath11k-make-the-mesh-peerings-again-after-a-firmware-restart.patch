@@ -1,0 +1,42 @@
+From: Stanislaw Pal <kuncy7@gmail.com>
+Subject: [PATCH] wifi: ath11k: make the mesh peerings again after a firmware restart
+
+After a firmware restart the firmware numbers the frames it protects
+from zero again (see "disconnect stations after a firmware restart").
+That patch reconnects station interfaces and makes the AP's stations
+reassociate, but left the mesh peers alone: nothing acts on a lost
+mesh peer report, and the peers kept dropping our frames as replays.
+On an Archer AX55 v1 (IPQ5018/QCN6122, SAE mesh to a GL-B3000) the
+mesh stayed "established" after a simulated crash of the 5 GHz
+firmware and carried no traffic: the peer's replay counter for our
+pairwise key grew by 214 in 90 s, 0 of 300 pings came back.
+
+Call ieee80211_hw_restart_disconnect() for the mesh interfaces too:
+mac80211 removes the peers and the peerings are made again with new
+keys, by the userspace MPM (wpa_supplicant) or the kernel's.
+
+Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
+
+--- a/drivers/net/wireless/ath/ath11k/mac.c
++++ b/drivers/net/wireless/ath/ath11k/mac.c
+@@ -9921,12 +9921,18 @@
+ 		}
+ 		/* When the firmware's transmit packet numbers restarted from
+ 		 * zero (see above), reconnect station interfaces too, whatever
+-		 * the firmware does with the MAC sequence numbers.
++		 * the firmware does with the MAC sequence numbers. A mesh
++		 * interface makes its peerings again for the same reason: its
++		 * peers drop our frames as replays until the numbers pass the
++		 * old ones, and nothing acts on a lost mesh peer report.
+ 		 */
+ 		if (ar->ab->hw_params.support_fw_mac_sequence ||
+ 		    ath11k_mac_fw_generates_pn(ar->ab)) {
+ 			list_for_each_entry(arvif, &ar->arvifs, list) {
+-				if (arvif->is_up && arvif->vdev_type == WMI_VDEV_TYPE_STA)
++				if (!arvif->is_up)
++					continue;
++				if (arvif->vdev_type == WMI_VDEV_TYPE_STA ||
++				    arvif->vif->type == NL80211_IFTYPE_MESH_POINT)
+ 					ieee80211_hw_restart_disconnect(arvif->vif);
+ 			}
+ 		}
