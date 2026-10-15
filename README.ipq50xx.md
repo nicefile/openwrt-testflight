@@ -82,7 +82,7 @@ image is for installing only: it runs from RAM, so with Wi-Fi up it can run out
 of memory.
 
 Every image is built with the whole plane in: `nss-tools-dwmac`, firmware
-12.2-156, VLAN and PPPoE managers, ath11k with the NSS patches, plus `ip-full`
+12.5-210 (12.2-156 up to `ipq50xx-2026.10.14`), VLAN and PPPoE managers, ath11k with the NSS patches, plus `ip-full`
 and `iperf3` for checking it. Boards come in two groups, because the ath11k and
 NSS memory profiles are a build-time choice for the whole image:
 
@@ -213,9 +213,10 @@ CONFIG_TARGET_qualcommax_ipq50xx_DEVICE_glinet_gl-b3000=y
 # kmod-qca-nss-ecm, kmod-qca-nss-drv-vlan-mgr, kmod-qca8337-nss
 CONFIG_PACKAGE_nss-tools-dwmac=y
 
-# firmware: 12.2-156, the one validated on IPQ5018 (see below)
+# firmware: 12.5-210, the one in the release images; 12.2-156 works as
+# well - see below, and build for the version you run
 CONFIG_PACKAGE_nss-firmware=y
-CONFIG_NSS_FIRMWARE_VERSION_12_2=y
+CONFIG_NSS_FIRMWARE_VERSION_12_5=y
 CONFIG_NSS_MEM_PROFILE_MEDIUM=y
 
 # qca-nss-drv features the plane uses
@@ -265,16 +266,24 @@ package unset, and gives an image whose 2.4 GHz radio does not come up
 `.config`, or unset the first and set
 `CONFIG_PACKAGE_ath11k-firmware-ipq5018-qcn6122=y`.
 
-### Firmware: why 12.2-156
+### Firmware: 12.5-210 and 12.2-156
 
-`NSS_FIRMWARE_VERSION_12_2` selects `NSS.FW.12.2-156-MP.R` from the same
-tarball the feed already uses. It is the newest firmware published for IPQ5018
-(May 2025, nine months after 12.5) and the one every measurement in this file
-was taken on. The feed defaults to it on ipq50xx since 12 October 2026; before
-that the default was 12.5 on every target, so a `.config` from an older build
-that never named a version keeps 12.5 until 12.2 is selected.
+The release images carry `NSS.FW.12.5-210-MP` since 15 October 2026
+(`NSS_FIRMWARE_VERSION_12_5` in `.github/ci/ipq50xx/common.config`); before
+that they carried `NSS.FW.12.2-156-MP.R` (`NSS_FIRMWARE_VERSION_12_2`), the
+newest firmware published for IPQ5018 (May 2025, nine months after 12.5),
+which most measurements in this file were taken on. On the GL-B3000 and the
+Archer AX55 v1 the two carry the same routed, bridged and 802.11s mesh traffic
+at the same speed. The feed still defaults to 12.2 on ipq50xx, so a `.config`
+of your own keeps whatever it names.
 
-- **12.5-210-MP** runs too: on a GL-B3000 it brought both radios up on the
+**Build for the firmware you run.** The two lay out the Wi-Fi peer statistics
+differently (196 against 212 bytes per entry), and `qca-nss-drv` is built for
+one of them: a 12.5 firmware file dropped onto a 12.2 build (or the other way
+round) carries traffic, but the Wi-Fi counters - `ip -s link` of the radio
+interfaces, `iw ... station dump` - stay at zero.
+
+- **12.5-210-MP** runs: on a GL-B3000 it brought both radios up on the
   offload, carried routed and Wi-Fi<->LAN TCP through the firmware and came
   through a cold boot (23 September 2026), and accelerated the bridged traffic
   of an access point with a VLAN-aware bridge (2 October 2026). Two earlier
@@ -720,6 +729,7 @@ Legend: ✅ offloaded & validated ·
 | L2 between LAN ports | ✅ | in the switch fabric (same VLAN), never reaches the SoC |
 | PPPoE | ✅ | Kernel patch `0961` gained the lockless `__ppp_hold_channels()` / `__ppp_is_multilink()` that ECM's deadlock fix needs, `kmod-qca-nss-drv-pppoe` is selected, and `nss-dwmac-up` **loads it** after the arm - without the manager in memory ECM tracks the PPPoE flows, marks every rule invalid and the WAN silently stays on the host path (measured: 0 rules, 22k exceptions in 20 s; the same silent failure AugustoAmaral hit before the package was selected at all, ~950 Mbit/s at 84-95 % idle on an AX6000 once it was in). Measured here on the `dsa` topology with the ISP's VLAN on the WAN port (`wan.35`, PPPoE server on the bench): rules created, 120k-157k firmware hits per 15-20 s, 0-65 exceptions, 2 % CPU, at the 100 Mbit/s ceiling of the bench client. On the trunk topology LS3434 runs it as `eth0.35` with `vtu='...;35:6t,2t'` (#154, #156): 890-950 down / 310 up at 1-5 % CPU. |
 | Wi-Fi (wifili) | ✅ | both radios; 734/447 Mbit/s over 5 GHz through the router, host ~90 % idle. Needs the core-clock fix - see below |
+| 802.11s mesh | ✅ | `std` group only; encap/decap and the path tables in the firmware, open and SAE. See "Mesh" below |
 | SQM / NSS qdiscs | ✅ | `dsa` topology: `sqm-scripts-nss` shapes the WAN flows in a lane on the conduit (`eth0`), the other ports' traffic passes unshaped; nsstbl + nssfq_codel in the firmware both ways (IGS for ingress). Measured on the GL-B3000: 91/91 Mbit/s at a 100/100 limit, 18/45 at 20/50, ~3 ms ping under load, host 97 % idle. See "SQM" below |
 | Multicast through ECM | ⬜ | built off on ipq50xx until it is measured with the DSA port nodes; the feed reads the bridge MDB now, `qca-mcs` is gone |
 | MAP-T / DS-Lite | 🟨 | `kmod-nat46` staging from the base; untested here |
@@ -795,6 +805,65 @@ died on its first cold boot - and an empty WIFILI section in `nss_stats` was our
 own N2H bounds check dropping every SOC statistics message, because those are
 larger (2092 B) than the data frame size the host advertises (2048 B).
 
+### Mesh (802.11s)
+
+The `std` images are built with the ath11k NSS mesh offload
+(`ATH11K_NSS_MESH_SUPPORT`, which pulls in `kmod-qca-nss-drv-wifi-meshmgr`):
+the firmware encapsulates and decapsulates the mesh frames and keeps the path
+and proxy tables, so a mesh backhaul - a second router as a satellite with the
+mesh in its LAN bridge, its LAN ports and access points behind it - is
+forwarded by the firmware like the rest. It was measured between a GL-B3000
+and an Archer AX55 v1 on 5 GHz, one hop, with 12.2 and 12.5: routed and
+bridged, open and SAE, a wired client behind the satellite, and a crash of the
+radio firmware on either side (the mesh makes its peerings again and carries
+traffic within seconds, see the fixes below; measured with `wpad-mesh-mbedtls`
+managing the peerings, open and SAE). Not tried: more than one hop, 2.4 GHz,
+a peer that is not offloaded, a firmware crash with an open mesh run by the
+kernel's own peering (`wpad-basic-mbedtls`). The `256m` images are built without
+it: the mesh costs memory those boards do not have to spare.
+
+An open mesh works with the image as it is. An encrypted mesh (SAE) needs the
+full mesh-capable `wpad`, which the image does not carry - it keeps
+`wpad-basic-mbedtls` like OpenWrt does. It is in this build's repository:
+
+```sh
+apk update
+apk add wpad-mesh-mbedtls    # replaces wpad-basic-mbedtls
+```
+
+A sysupgrade puts `wpad-basic-mbedtls` back: install it again afterwards (on
+a satellite without its own WAN, copy the package over and use
+`apk add --allow-untrusted --no-network <file>`).
+
+Both nodes use the same channel, and the mesh goes into the LAN bridge
+(`/etc/config/wireless`):
+
+```
+config wifi-iface 'mesh5'
+	option device 'radio1'
+	option mode 'mesh'
+	option mesh_id 'my-mesh'
+	option encryption 'sae'        # or 'none'
+	option key 'a long passphrase'
+	option network 'lan'
+```
+
+On the satellite the LAN has no DHCP server and takes an address in the main
+router's subnet; the main router hands out the addresses for both.
+
+What it needed, in this branch:
+- the offload allowed on ipq50xx with the 12.x firmware: the ath11k option was
+  tied to firmware 11.4, while on IPQ5018 both 12.2 and 12.5 answer the mesh
+  capability query and create the mesh objects;
+- after a crash of the radio firmware the firmware numbers the protected
+  frames from zero again, and the peer that did not restart drops everything
+  as a replay: `999-931` (mac80211) and `999-9967` (ath11k) remove the mesh
+  peers once the restart is done, and the hostapd patch `990` has
+  wpa_supplicant close those links and make them again;
+- Adriel Santos's flush of the offloaded path tables on that restart
+  (`nss-extra/mesh/999-992`), without which the firmware's empty path table
+  never gets the paths back.
+
 ## 256 MB boards
 
 Three IPQ5018 boards on this branch have 256 MB - the TP-Link EX511 v2
@@ -858,7 +927,9 @@ OOM-killed the AP daemon on a single iperf3 run. What it needed, all in the bran
     both places - the EX511 v2 and the Cudy P5 are, in both; the AX3000T v2
     is named here and in kuncy7/nss-packages#4, which is not merged yet. The
     firmware version
-  (`NSS_FIRMWARE_VERSION_12_2`) is the feed's default on ipq50xx. `qcom,ath11k-fw-memory-mode = <2>` on both radios is in
+  (`NSS_FIRMWARE_VERSION_12_2`) is the feed's default on ipq50xx; the release
+  images carry 12.5 since 15 October 2026, which has not been run on a 256 MB
+  board yet. `qcom,ath11k-fw-memory-mode = <2>` on both radios is in
   the DTS.
 
 Result: ~850 / ~740 Mbit/s on 5 GHz with 4 streams (stock: 843 / 906),
