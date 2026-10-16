@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nss-tools
-PKG_RELEASE:=19
+PKG_RELEASE:=20
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -91,23 +91,6 @@ define Package/nssqos/conffiles
 /etc/config/nssqos
 endef
 
-define Package/luci-app-nss
-  SECTION:=luci
-  CATEGORY:=LuCI
-  SUBMENU:=3. Applications
-  TITLE:=LuCI status page for NSS offloading
-  DEPENDS:=+luci-base +TARGET_qualcommax_ipq50xx:nss-tools-dwmac \
-	+!TARGET_qualcommax_ipq50xx:nss-tools
-  PKGARCH:=all
-endef
-
-define Package/luci-app-nss/description
- Status -> NSS Offload: renders 'nss-status -j' (firmware state, cores,
- ports, ECM acceleration counts, SQM/fast-lane health) in LuCI, and adds
- the NSS core load and the ECM-accelerated connections to Status ->
- Overview.
-endef
-
 define Package/luci-app-nssqos
   SECTION:=luci
   CATEGORY:=LuCI
@@ -171,17 +154,6 @@ define Package/nssqos/install
 	$(INSTALL_BIN) ./files/nssqos-resolve $(1)/usr/sbin/nssqos-resolve
 endef
 
-define Package/luci-app-nss/install
-	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/nss
-	$(INSTALL_DATA) ./files/luci-nss-status.js $(1)/www/luci-static/resources/view/nss/status.js
-	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/status/include
-	$(INSTALL_DATA) ./files/luci-nss-overview.js $(1)/www/luci-static/resources/view/status/include/16_nss_offload.js
-	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
-	$(INSTALL_DATA) ./files/luci-app-nss.menu.json $(1)/usr/share/luci/menu.d/luci-app-nss.json
-	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
-	$(INSTALL_DATA) ./files/luci-app-nss.acl.json $(1)/usr/share/rpcd/acl.d/luci-app-nss.json
-endef
-
 define Package/luci-app-nssqos/install
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/nss
 	$(INSTALL_DATA) ./files/luci-nss-qos.js $(1)/www/luci-static/resources/view/nss/qos.js
@@ -195,5 +167,4 @@ endef
 $(eval $(call BuildPackage,nss-tools))
 $(eval $(call BuildPackage,nss-tools-dwmac))
 $(eval $(call BuildPackage,nssqos))
-$(eval $(call BuildPackage,luci-app-nss))
 $(eval $(call BuildPackage,luci-app-nssqos))

@@ -259,6 +259,8 @@ jobs:
           # and their wpad-mesh-mbedtls lacks this tree's hostapd patches (the mesh peering after
           # a radio firmware restart) - README tells std users to install it from here.
           cp bin/packages/*/base/luci-app-nss-*.apk "bin/targets/${TARGET}/packages/"
+          # and its translations, luci-i18n-nss-<lang>, once po/<lang>/nss.po exists for one
+          for f in bin/packages/*/base/luci-i18n-nss-*.apk; do [ -e "$f" ] && cp "$f" "bin/targets/${TARGET}/packages/"; done
           if grep -q '^CONFIG_PACKAGE_wpad-mesh-mbedtls=[my]' .config; then
             cp bin/packages/*/base/wpad-mesh-mbedtls-*.apk "bin/targets/${TARGET}/packages/"
           fi

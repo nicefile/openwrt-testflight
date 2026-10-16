@@ -1,0 +1,276 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:134
+msgid "%s IPv4 / %s IPv6 / %s multicast"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:131
+msgid "%s pkts/s (NSS→host)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:136
+msgid "Bridge offload (bridge-mgr)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:18
+msgid "CPU temperature"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:133
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:119
+msgid "ECM accelerated connections"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:135
+msgid "ECM not loaded"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:115
+msgid ""
+"Each standalone switch port reaches the firmware as its own VLAN node on the "
+"GMAC above. A bridge has one node that all its switch ports share, and a "
+"VLAN-aware bridge has one for each of its VLANs."
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:146
+msgid "Fast lane"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:130
+msgid "Firmware"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:21
+msgid ""
+"Firmware armed but heartbeat silent — check the system log; a reboot returns "
+"to the host stack"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:150
+msgid "Firmware-attached ports"
+msgstr ""
+
+#: package/nss/luci-app-nss/root/usr/share/rpcd/acl.d/luci-app-nss.json:3
+msgid "Grant access to the NSS offload status page"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:131
+msgid "Heartbeat"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:22
+msgid "Host stack (NSS plane not armed)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:99
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:119
+msgid "Link"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:183
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:93
+#: package/nss/luci-app-nss/root/usr/share/luci/menu.d/luci-app-nss.json:3
+msgid "NSS Offload"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:114
+msgid "NSS core %s load"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:132
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:114
+msgid "NSS core load"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:62
+msgid "NSS offload active (wifili)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:61
+msgid "NSS offload active (wifili, 802.11s mesh offloaded)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:19
+msgid "NSS temperature"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:163
+msgid "No ports attached — host stack"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:90
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:109
+msgid "Node"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:20
+msgid "Offload active"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:166
+msgid ""
+"Offloaded packets are forwarded by the firmware and never reach the host. "
+"\"via host\" / \"to host\" is the host↔firmware exception path — what was "
+"not offloaded — so low numbers there mean offload is working. Broadcast and "
+"multicast discovery, connection setup, short-lived flows and traffic "
+"addressed to the router itself always take that path: a flow is only "
+"offloaded once it is established, so a quiet port that carries little else "
+"shows a low offloaded share. Port totals are on Status → Overview."
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:21
+msgid "Other SoC temperature"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:137
+msgid "PPPoE manager"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:73
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:98
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:118
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:153
+msgid "Port"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:78
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:158
+msgid "RX offloaded"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:101
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:121
+msgid "RX packets"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:79
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:159
+msgid "RX to host"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:139
+msgid "SQM shaper"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:75
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:155
+msgid "Started"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:93
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:112
+msgid "Switch ports"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:106
+msgid "Switch ports and bridges on the firmware (DSA)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:76
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:156
+msgid "TX offloaded"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:100
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:120
+msgid "TX packets"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:77
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:157
+msgid "TX via host"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:124
+msgid ""
+"The offloaded share is part of the GMAC's figures above; the totals here are "
+"each port's own switch counters, all its VLANs together."
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:138
+msgid "Wi-Fi data path"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:20
+msgid "Wi-Fi temperature"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:67
+msgid "ath11k not loaded"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:115
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:129
+msgid "avg"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:99
+msgid "down"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:146
+msgid "egress %s pkts / ingress %s pkts — %s marking rules"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:66
+msgid "host mode"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:64
+msgid "host mode (mesh configured; firmware supports mesh offload)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:65
+msgid "host mode (mesh configured; this NSS firmware has no mesh offload)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:41
+msgid "loaded"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:115
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:129
+msgid "max"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:115
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:129
+msgid "min"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:75
+msgid "no"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:144
+msgid "no NSS shaper"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:144
+msgid "no NSS shaper on %s"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:41
+msgid "not loaded"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:142
+msgid "nsstbl on %s"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:141
+msgid "nsstbl on %s (a lane on the switch conduit %s)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:99
+msgid "up"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:143
+msgid "upload IGS: %s"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:75
+msgid "yes"
+msgstr ""

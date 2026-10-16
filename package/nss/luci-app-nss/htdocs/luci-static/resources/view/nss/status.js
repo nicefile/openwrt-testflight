@@ -54,15 +54,15 @@ function renderStatus(d) {
 		return i.port + (i.active ? ' ✓' : ' ✗');
 	}).join('  ');
 
-	// d.mesh: {configured, fw_capable} - 802.11s mesh only offloads on the
-	// 11.4 firmware line; everywhere else it stays on the host path.
+	// d.mesh: {configured, fw_capable} - whether a mesh interface is set up
+	// and whether the loaded firmware offloads 802.11s mesh.
 	var mesh = d.mesh || {};
 	var wifi = d.wifi_offload == 1 ?
 	               (mesh.configured ? _('NSS offload active (wifili, 802.11s mesh offloaded)')
 	                                : _('NSS offload active (wifili)')) :
 	           d.wifi_offload == 0 ?
 	               (mesh.configured && mesh.fw_capable ? _('host mode (mesh configured; firmware supports mesh offload)') :
-	                mesh.configured ? _('host mode (mesh configured; mesh offload needs the 11.4 NSS firmware)') :
+	                mesh.configured ? _('host mode (mesh configured; this NSS firmware has no mesh offload)') :
 	                                  _('host mode')) :
 	           _('ath11k not loaded');
 
@@ -128,23 +128,23 @@ function renderStatus(d) {
 		E('p', {}, stateBadge(d.state)),
 		E('table', { 'class': 'table' }, [
 			row(_('Firmware'), d.fw_version + ' (fw_mask ' + d.fw_mask + ')'),
-			row(_('Heartbeat'), d.heartbeat_pps + ' ' + _('pkts/s (NSS→host)')),
+			row(_('Heartbeat'), _('%s pkts/s (NSS→host)').format(d.heartbeat_pps)),
 			row(_('NSS core load'), cores || '-'),
 			row(_('ECM accelerated connections'), d.ecm.loaded
-				? d.ecm.ipv4_accel + ' IPv4 / ' + d.ecm.ipv6_accel + ' IPv6 / ' + d.ecm.multicast_accel + ' ' + _('multicast')
+				? _('%s IPv4 / %s IPv6 / %s multicast').format(d.ecm.ipv4_accel, d.ecm.ipv6_accel, d.ecm.multicast_accel)
 				: _('ECM not loaded')),
 			row(_('Bridge offload (bridge-mgr)'), onoff(d.modules.bridge_mgr)),
 			row(_('PPPoE manager'), onoff(d.modules.pppoe)),
 			row(_('Wi-Fi data path'), wifi),
 			row(_('SQM shaper'), d.sqm.active
-				? _('nsstbl on') + ' ' + d.sqm.device +
-					(d.sqm.lanes ? ' (' + _('a lane on the switch conduit') + ' ' + d.sqm.shaping_device + ')' : '') +
-					(igs ? ' — ' + _('upload IGS:') + ' ' + igs : '')
-				: (d.sqm.device ? _('no NSS shaper on') + ' ' + d.sqm.device : _('no NSS shaper'))),
+				? (d.sqm.lanes
+					? _('nsstbl on %s (a lane on the switch conduit %s)').format(d.sqm.device, d.sqm.shaping_device)
+					: _('nsstbl on %s').format(d.sqm.device)) +
+					(igs ? ' — ' + _('upload IGS: %s').format(igs) : '')
+				: (d.sqm.device ? _('no NSS shaper on %s').format(d.sqm.device) : _('no NSS shaper'))),
 			(d.sqm.fastlane && d.sqm.fastlane.active)
-				? row(_('Fast lane'), _('egress') + ' ' + d.sqm.fastlane.egress_pkts + ' pkts / ' +
-					_('ingress') + ' ' + d.sqm.fastlane.ingress_pkts + ' pkts — ' +
-					(d.sqm.qos_marking_rules || 0) + ' ' + _('marking rules'))
+				? row(_('Fast lane'), _('egress %s pkts / ingress %s pkts — %s marking rules').format(
+					d.sqm.fastlane.egress_pkts, d.sqm.fastlane.ingress_pkts, d.sqm.qos_marking_rules || 0))
 				: E('tr', { 'style': 'display:none' })
 		]),
 		E('h3', {}, _('Firmware-attached ports')),

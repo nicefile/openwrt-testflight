@@ -112,7 +112,7 @@ return baseclass.extend({
 
 		cores.forEach(function(c) {
 			rows.push([ cores.length > 1 ? _('NSS core %s load').format(c.core) : _('NSS core load'),
-				pills([ [ 'min', c.min ], [ 'avg', c.avg ], [ 'max', c.max ] ]) ]);
+				pills([ [ _('min'), c.min ], [ _('avg'), c.avg ], [ _('max'), c.max ] ]) ]);
 		});
 
 		if (data[1] != null)
@@ -126,7 +126,7 @@ return baseclass.extend({
 			    avg = t.reduce(function(a, b) { return a + b; }, 0) / t.length;
 
 			rows.push([ g.title, (t.length > 1)
-				? pills([ [ 'min', deg(min) ], [ 'avg', deg(avg) ], [ 'max', deg(max) ] ])
+				? pills([ [ _('min'), deg(min) ], [ _('avg'), deg(avg) ], [ _('max'), deg(max) ] ])
 				: pills([ [ null, deg(t[0]) ] ]) ]);
 		});
 
