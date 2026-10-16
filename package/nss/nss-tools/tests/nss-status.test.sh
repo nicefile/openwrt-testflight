@@ -474,6 +474,14 @@ else
 	check 'sqm on a switch port: and says so, naming the port' \
 		1 "$(run_dw | grep -c 'no NSS shaper on wan')"
 
+	# Only the stock entry, disabled: SQM is off, and its eth1 is not named.
+	printf "sqm.eth1=queue\nsqm.eth1.enabled='0'\nsqm.eth1.interface='eth1'\n" > "$root/uci.out"
+	check 'sqm: only a disabled queue reads as off' \
+		1 "$(run_dw | grep -c 'SQM:         off (no queue enabled')"
+	check 'sqm: and the disabled queue device is not named' \
+		0 "$(run_dw | grep -c 'shaper on eth1')"
+	check 'sqm: json says not enabled' 0 "$(json_num "$(sqm_obj "$(run_dw -j)")" enabled)"
+
 	# No conduit below the netdev: it is its own shaping point (the EDMA stack).
 	printf "sqm.wan=queue\nsqm.wan.enabled='1'\nsqm.wan.interface='lan1'\n" > "$root/uci.out"
 	printf 'qdisc nsstbl 1: root refcnt 2 rate 165Mbit\nqdisc nssfq_codel 10: parent 1: set_default\n' \

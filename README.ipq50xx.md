@@ -274,8 +274,8 @@ that they carried `NSS.FW.12.2-156-MP.R` (`NSS_FIRMWARE_VERSION_12_2`), the
 newest firmware published for IPQ5018 (May 2025, nine months after 12.5),
 which most measurements in this file were taken on. On the GL-B3000 and the
 Archer AX55 v1 the two carry the same routed, bridged and 802.11s mesh traffic
-at the same speed. The feed still defaults to 12.2 on ipq50xx, so a `.config`
-of your own keeps whatever it names.
+at the same speed. The feed defaults to 12.5 as well; a `.config` of your
+own that already names a version keeps it.
 
 **Build for the firmware you run.** The two lay out the Wi-Fi peer statistics
 differently (196 against 212 bytes per entry), and `qca-nss-drv` is built for

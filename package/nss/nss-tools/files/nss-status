@@ -241,6 +241,11 @@ done
 nss_sqm_section
 sqm_sec=$NSS_SQM_SEC
 sqm_dev=$NSS_SQM_DEV
+# With no queue enabled the section above is just the first one, often the
+# stock sqm-scripts entry (interface eth1, disabled): naming its device in
+# the report reads as if SQM were meant to run there.
+sqm_enabled=0
+[ -n "$sqm_sec" ] && [ "$(uci -q get "sqm.${sqm_sec}.enabled")" = "1" ] && sqm_enabled=1
 
 # Where the egress tree sits. On the EDMA stack that is the section's interface
 # itself. A DSA user port has its conduit as a sysfs lower link (the conduit
@@ -377,7 +382,7 @@ if [ "$JSON" = 1 ]; then
 	"wifi_offload":$wifi_offload,
 	"mesh":{"configured":$mesh_cfg,"offloaded":$mesh_vdev,"fw_capable":$mesh_capable},
 	"kernel_log":{"warns":$kwarns,"oopses":$koops},
-	"sqm":{"active":$sqm_active,"device":"$sqm_dev","shaping_device":"$sqm_phys","lanes":$sqm_lanes,"igs":$ijson,
+	"sqm":{"enabled":$sqm_enabled,"active":$sqm_active,"device":"$sqm_dev","shaping_device":"$sqm_phys","lanes":$sqm_lanes,"igs":$ijson,
 	"shaper_fault":$sfjson,
 	"fastlane":{"active":$fl_active,"egress_pkts":${fl_egress:-0},"ingress_pkts":${fl_ingress:-0}},
 	"qos_marking_rules":$qos_rules}}
@@ -590,8 +595,10 @@ if [ "$sqm_active" = 1 ]; then
 	if [ "$fl_active" = 1 ]; then
 		echo "  fast lane:   egress ${fl_egress:-0} pkts / ingress ${fl_ingress:-0} pkts, ${qos_rules} marking rules active"
 	fi
-else
+elif [ "$sqm_enabled" = 1 ]; then
 	echo "  SQM:         no NSS shaper${sqm_dev:+ on $sqm_dev}"
+else
+	echo "  SQM:         off (no queue enabled in /etc/config/sqm)"
 fi
 if [ "$kwarns" -gt 0 ] || [ "$koops" -gt 0 ]; then
 	echo "  kernel log:  $kwarns WARN / $koops oops this boot - see 'nss-status -d' or dmesg"
