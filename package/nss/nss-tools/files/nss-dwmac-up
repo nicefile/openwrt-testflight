@@ -381,6 +381,35 @@ else
   echo "WARN: NSS plane armed but ECM is not accelerating (no ecm_nss_ipv4 in debugfs) - check 'logread | grep -i ecm'"
 fi
 
+# SQM queues of the NSS script refuse to start before the arm ("NSS data plane
+# is not armed"), and a queue is started again only by the ifup of an
+# interface whose device stack holds it. Where that ifup came before the arm -
+# a LAN conduit such as eth0 carrying a queue that shapes wired downloads, the
+# way to do it where download shaping on the WAN is not available - the queue
+# never starts (reported on a Xiaomi AX6000, issue 27). Start those queues now:
+# enabled, of this script, without a state file, and on a device that is up.
+# A queue on a device that is down (a WAN without link) is left to the
+# hotplug of its interface, as before; one whose interface is not ready yet (a
+# PPPoE without its address) leaves the wire empty and waits for it too.
+sqm_start_missed() {
+  local s dev
+  [ -x /usr/lib/sqm/run.sh ] || return 0
+  /etc/init.d/sqm enabled 2>/dev/null || return 0
+  SQM_STATE_DIR=/var/run/sqm
+  [ -r /etc/sqm/sqm.conf ] && . /etc/sqm/sqm.conf
+  for s in $(uci -q show sqm | sed -n 's/^sqm\.\([^.=]*\)=queue$/\1/p'); do
+    [ "$(uci -q get "sqm.$s.enabled")" = 1 ] || continue
+    [ "$(uci -q get "sqm.$s.script")" = nss-edma.qos ] || continue
+    dev="$(uci -q get "sqm.$s.interface")"
+    [ -n "$dev" ] || continue
+    [ -f "$SQM_STATE_DIR/$dev.state" ] && continue
+    [ "$(cat "/sys/class/net/$dev/operstate" 2>/dev/null)" = up ] || continue
+    echo "SQM queue on $dev did not start before the arm - starting it"
+    /usr/lib/sqm/run.sh start "$dev" 2>/dev/null || true
+  done
+}
+sqm_start_missed
+
 # Everything is registered by now - the NSS queues at the arm, the copy
 # engines at ath11k probe - so this is the first moment the interrupts
 # can be placed on the two cores. See the script for why the driver's
