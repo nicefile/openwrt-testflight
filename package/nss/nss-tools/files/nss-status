@@ -572,7 +572,7 @@ case "$wifi_offload" in
 	0)  if [ "$mesh_cfg" = 1 ] && [ "$mesh_capable" = 1 ]; then
 	        echo "  Wi-Fi:       host mode (mesh configured; firmware supports mesh offload - armed by nss-up)"
 	    elif [ "$mesh_cfg" = 1 ]; then
-	        echo "  Wi-Fi:       host mode (mesh configured; mesh offload needs the 11.4 NSS firmware and a mesh-enabled build)"
+	        echo "  Wi-Fi:       host mode (mesh configured; this firmware or build has no NSS mesh offload)"
 	    else
 	        echo "  Wi-Fi:       host mode"
 	    fi ;;

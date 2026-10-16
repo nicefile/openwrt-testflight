@@ -24,9 +24,14 @@ nss_mesh_state() {
 	NSS_MESH_CFG=0
 	uci -q show wireless | grep -q "\.mode='mesh'" && NSS_MESH_CFG=1
 	NSS_MESH_CAPABLE=0
+	[ -e "/lib/modules/$(uname -r)/qca-nss-wifi-meshmgr.ko" ] || return 0
+	# 11.4 on ipq807x/ipq60xx, where newer firmware rejects the mesh vdev;
+	# on IPQ5018 the 12.2 and 12.5 firmware run the mesh offload as well.
 	case "$(nss_fw_version)" in
-	*.11.4.*) [ -e "/lib/modules/$(uname -r)/qca-nss-wifi-meshmgr.ko" ] && NSS_MESH_CAPABLE=1 ;;
+	*.11.4.*) NSS_MESH_CAPABLE=1 ;;
+	*.12.*) grep -q 'qcom,ipq5018' /proc/device-tree/compatible 2>/dev/null && NSS_MESH_CAPABLE=1 ;;
 	esac
+	return 0
 }
 
 # poll_until <seconds> <command...>: run the command once per second until
