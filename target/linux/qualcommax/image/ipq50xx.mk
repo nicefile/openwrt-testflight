@@ -513,7 +513,7 @@ define Device/xunison_exigo-hub-d50-5g
 	DEVICE_DTS_CONFIG := config@mp03.1
 	IMAGES := factory.img sysupgrade.bin
 	IMAGE/factory.img := append-ubi | check-size
-	DEVICE_PACKAGES := ath11k-firmware-ipq5018 \
+	DEVICE_PACKAGES := ath11k-firmware-ipq5018-qcn6122 \
 		kmod-ath11k-pci \
 		ath11k-firmware-qcn9074 \
 		ipq-wifi-xunison_exigo-hub-d50-5g \
