@@ -772,6 +772,36 @@ Not available there: `igs_upload` (the firmware refuses a redirect off a switch 
 originates is not marked and goes through the unshaped band. Measured on the GL-B3000 and the Archer AX55 v1
 (fw 12.2-156); the 256 MB boards have not been tried.
 
+**A WAN on its own GMAC with PPPoE straight on it** (the Xiaomi AX6000, the second GMAC as `wan`, no switch and no
+VLAN in between) takes the other branch: the trees go on `wan` itself, without lanes. Upload shaping works there.
+Download shaping does not: the ingress redirect shapes, but the firmware's PPPoE node refuses what the IFB hands
+back (`short_packet_length` in `stats/pppoe`), so the whole download goes to the host; a redirect from the PPPoE
+session instead is not accepted by the firmware. The script therefore shapes only the upload on that layout and
+logs an error for the download. To shape the downloads of wired clients there, put a second queue on the LAN
+conduit - its egress is what leaves towards the LAN ports - with the download cap as its upload:
+
+```
+config queue 'wan'
+	option enabled '1'
+	option interface 'wan'
+	option script 'nss-edma.qos'
+	option download '0'
+	option upload '240000'
+
+config queue 'lan'
+	option enabled '1'
+	option interface 'eth0'
+	option script 'nss-edma.qos'
+	option download '0'
+	option upload '880000'
+```
+
+It stays on the offload path. It does not cover Wi-Fi clients, whose traffic does not cross the conduit, and it
+only makes sense where the WAN is not on that conduit - on a single-GMAC board such as the GL-B3000 `eth0` already
+carries the WAN's lanes. The NSS service starts such a queue after the arm (it has no interface of its own whose
+hotplug would). Reported and measured by a user on the AX6000 (issue 27); a VLAN on the GMAC (`wan.35` with
+PPPoE on it) has not been tried.
+
 ### The single CPU port ceiling
 
 Every routed flow crosses the trunk twice - in on one VLAN, out on the other -
