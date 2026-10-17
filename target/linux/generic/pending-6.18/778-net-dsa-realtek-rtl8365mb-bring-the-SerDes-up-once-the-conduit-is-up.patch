@@ -1,6 +1,6 @@
-From 184dc09e941ca3c83c9799b0dc9290c9bf6fb72d Mon Sep 17 00:00:00 2001
-From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
-Date: Sat, 20 Sep 2026 12:00:00 +0200
+From 9988ea19e4c5f1540596045fd8e326f003c4ba69 Mon Sep 17 00:00:00 2001
+From: Stanislaw Pal <kuncy7@gmail.com>
+Date: Sun, 20 Sep 2026 12:00:00 +0200
 Subject: [PATCH] net: dsa: realtek: rtl8365mb: bring the SerDes up once the
  conduit is up
 
@@ -46,37 +46,35 @@ revisions, one stacked on another pending rtl8365mb series and one on
 its own, gave 16 of 16 and 17 of 17.
 
 Tested-by: Johan Alvarado <contact@c127.dev>
-Co-developed-by: Stanislaw Pal <kuncy7@gmail.com>
 Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
+[namiltd: rebase onto the family D series; family D keeps its own
+ bring-up order and does not defer]
 Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 ---
- drivers/net/dsa/realtek/rtl8365mb_main.c | 223 ++++++++++++++++++++++-
- 1 file changed, 213 insertions(+), 10 deletions(-)
+ drivers/net/dsa/realtek/rtl8365mb_main.c | 227 +++++++++++++++++++++--
+ 1 file changed, 213 insertions(+), 14 deletions(-)
 
 --- a/drivers/net/dsa/realtek/rtl8365mb_main.c
 +++ b/drivers/net/dsa/realtek/rtl8365mb_main.c
-@@ -943,6 +943,15 @@ struct rtl8365mb_port {
-  * @pcs: PCS for the SerDes external interface
-  * @sds_supported: SerDes tuning parameters match the chip option, so the
-  *                 SerDes interface modes can be advertised
-+ * @sds_defer_lock: serializes the SerDes bring-up and the deferral state below
+@@ -989,6 +989,14 @@ struct rtl8365mb_port {
+  * @sds_misc_target_val: SDS_MISC_CFG_MASK fields the re-latch work restores
+  * @sds_relatch_armed: pcs_config() set up 2500base-x; the re-latch work may run
+  * @sds_conduit_up: the CPU port conduit is admin and oper up
 + * @sds_defer_needed: the SerDes bring-up is held back until the conduit behind
 + *                    the SerDes CPU port is up, see
-+ *                    rtl8365mb_conduit_state_change()
++ *                    rtl8365mb_sds_defer_needed() (family C)
 + * @sds_deferred: a bring-up requested by pcs_config() is pending
 + * @sds_link_deferred: pcs_link_up() was called while the bring-up was pending
-+ * @sds_interface: interface mode of the last pcs_config() request
++ * @sds_interface: interface mode of the pending pcs_config() request
 + * @sds_speed: speed of the pending pcs_link_up()
 + * @sds_duplex: duplex of the pending pcs_link_up()
   *
   * Private data for this driver.
   */
-@@ -972,6 +981,14 @@ struct rtl8365mb {
- 	unsigned long sds_relatch_last;		/* last attempt, for the interval */
- 	unsigned int sds_relatch_count;		/* attempts this episode, 0 once latched */
+@@ -1017,6 +1025,12 @@ struct rtl8365mb {
  	u32 sds_misc_target_val;
-+	/* serializes the SerDes bring-up and the sds_* fields below */
-+	struct mutex sds_defer_lock;
+ 	bool sds_relatch_armed;
+ 	bool sds_conduit_up;
 +	bool sds_defer_needed;
 +	bool sds_deferred;
 +	bool sds_link_deferred;
@@ -86,8 +84,8 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
  };
  
  #define pcs_to_rtl8365mb(_pcs) container_of((_pcs), struct rtl8365mb, pcs)
-@@ -1540,20 +1557,22 @@ static void rtl8365mb_sds_relatch_schedu
- 			      time_before(jiffies, due) ? due - jiffies : 0);
+@@ -1558,28 +1572,30 @@ static int rtl8365mb_sds_relatch_restore(struct rtl8365mb *mb)
+ 	return ret;
  }
  
 -static int rtl8365mb_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
@@ -97,12 +95,12 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +/* The hardware half of pcs_config(): tune and mux the SerDes for the
 + * interface mode, take it out of reset and clear the data path. It runs from
 + * rtl8365mb_pcs_config(), or from rtl8365mb_conduit_state_change() when the
-+ * conduit was not up yet at pcs_config() time.
++ * bring-up was held back, in both cases with sds_cfg_lock held.
 + */
 +static int rtl8365mb_sds_config(struct rtl8365mb *mb, phy_interface_t interface)
  {
- 	const int id = RTL8365MB_SDS_EXT_INTERFACE_ID;
  	const struct rtl8365mb_jam_tbl_entry *sds_jam;
+ 	const int id = RTL8365MB_SDS_EXT_INTERFACE_ID;
 -	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
  	struct realtek_priv *priv = mb->priv;
  	size_t sds_jam_size;
@@ -114,10 +112,21 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
  	bool is_d;
  	u16 val;
  	int ret;
-@@ -1667,6 +1686,25 @@ static int rtl8365mb_pcs_config(struct p
+ 	int i;
  
- 		WRITE_ONCE(mb->sds_misc_target_val, misc_val);
- 	} else {
+-	is_d = rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D;
++	lockdep_assert_held(&mb->sds_cfg_lock);
+ 
+-	guard(mutex)(&mb->sds_cfg_lock);
++	is_d = rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D;
+ 
+ 	/* Cancel any in-flight re-latch edge before touching SDS_MISC: the
+ 	 * work parks SDS_MISC and restores the target value after a sleep, so
+@@ -1672,6 +1688,24 @@ static int rtl8365mb_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
+ 		misc_val  = (sds_mode == RTL8365MB_EXT_PORT_MODE_SGMII) ?
+ 			    RTL8365MB_SDS_MISC_MAC8_SEL_SGMII_MASK :
+ 			    RTL8365MB_SDS_MISC_MAC8_SEL_HSGMII_MASK;
++
 +		/* Where the bring-up is held back, park the mux first: the
 +		 * receiver latches on the DISABLE -> mode edge, so a bring-up
 +		 * run on a mux that already holds the mode - the deferred one
@@ -126,39 +135,20 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +		 * keep the plain update below.
 +		 */
 +		if (mb->sds_defer_needed) {
-+			mutex_lock(&mb->sds_lock);
-+			ret = regmap_update_bits_check(priv->map, RTL8365MB_SDS_MISC_REG,
++			ret = regmap_update_bits_check(priv->map,
++						       RTL8365MB_SDS_MISC_REG,
 +						       misc_mask, 0, &parked);
-+			mutex_unlock(&mb->sds_lock);
 +			if (ret)
 +				return ret;
 +
 +			if (parked)
 +				usleep_range(20000, 21000);
 +		}
-+
- 		mutex_lock(&mb->sds_lock);
- 		ret = regmap_update_bits(priv->map, RTL8365MB_SDS_MISC_REG,
- 					 misc_mask, misc_val);
-@@ -1937,12 +1975,11 @@ static void rtl8365mb_pcs_get_state(stru
  	}
- }
  
--static void rtl8365mb_pcs_link_up(struct phylink_pcs *pcs,
--				  unsigned int neg_mode,
--				  phy_interface_t interface, int speed,
--				  int duplex)
-+/* The hardware half of pcs_link_up(): force the SerDes link parameters.
-+ * Deferred together with rtl8365mb_sds_config() when the conduit is not up.
-+ */
-+static void rtl8365mb_sds_link_up(struct rtl8365mb *mb, int speed, int duplex)
- {
--	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
- 	struct realtek_priv *priv = mb->priv;
- 	u32 mask = RTL8365MB_SDS_MISC_SGMII_FDUP_MASK |
- 		   RTL8365MB_SDS_MISC_SGMII_LINK_MASK |
-@@ -1993,6 +2030,161 @@ static void rtl8365mb_pcs_link_up(struct
- 	}
+ 	ret = regmap_update_bits(priv->map, RTL8365MB_SDS_MISC_REG,
+@@ -1751,6 +1785,134 @@ static int rtl8365mb_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
+ 	return 0;
  }
  
 +/* The CPU port behind the SerDes external interface, or NULL when the SerDes
@@ -191,7 +181,7 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +	return NULL;
 +}
 +
-+/* Bring the SerDes up only once the conduit is up.
++/* Bring the family C SerDes up only once the conduit is up.
 + *
 + * phylink configures the switch end of a SerDes CPU port as soon as the
 + * switch is set up, seconds before the conduit MAC configures its own end.
@@ -208,6 +198,8 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 + *
 + * This has only been seen with an IPQ5018 GMAC as the conduit, so the
 + * bring-up is held back only there; other boards keep the current order.
++ * Family D has its own answer to the far end coming up late, the re-latch
++ * work, which also starts from conduit_state_change().
 + */
 +static bool rtl8365mb_sds_defer_needed(struct rtl8365mb *mb)
 +{
@@ -232,29 +224,101 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +{
 +	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
 +	struct dsa_port *dp;
-+	int ret;
 +
-+	mutex_lock(&mb->sds_defer_lock);
-+	mb->sds_interface = interface;
++	guard(mutex)(&mb->sds_cfg_lock);
++
 +	mb->sds_link_deferred = false;
 +	dp = mb->sds_defer_needed ? rtl8365mb_sds_cpu_port(mb) : NULL;
 +	/* Same predicate DSA uses for the operational flag that drives
 +	 * conduit_state_change(), so the two can never disagree.
 +	 */
 +	if (dp && !dsa_port_conduit_is_operational(dp)) {
++		mb->sds_interface = interface;
 +		mb->sds_deferred = true;
 +		dev_dbg(mb->priv->dev, "SerDes bring-up held until %s is up\n",
 +			dp->conduit->name);
-+		ret = 0;
-+	} else {
-+		mb->sds_deferred = false;
-+		ret = rtl8365mb_sds_config(mb, interface);
++		return 0;
 +	}
-+	mutex_unlock(&mb->sds_defer_lock);
 +
-+	return ret;
++	mb->sds_deferred = false;
++	return rtl8365mb_sds_config(mb, interface);
 +}
 +
++static void rtl8365mb_sds_link_up(struct rtl8365mb *mb, int speed, int duplex);
++
++/* The held back family C bring-up, run once the conduit is up. Called with
++ * sds_cfg_lock held.
++ */
++static void rtl8365mb_sds_deferred_bringup(struct rtl8365mb *mb,
++					   const struct net_device *conduit)
++{
++	struct realtek_priv *priv = mb->priv;
++	struct dsa_port *dp;
++	int ret;
++
++	dp = rtl8365mb_sds_cpu_port(mb);
++	if (!mb->sds_deferred || !dp || dp->conduit != conduit)
++		return;
++
++	/* On failure the bring-up stays pending, so it is tried again the
++	 * next time the conduit comes up.
++	 */
++	ret = rtl8365mb_sds_config(mb, mb->sds_interface);
++	if (ret) {
++		dev_err(priv->dev, "SerDes bring-up after %s link up failed: %pe\n",
++			conduit->name, ERR_PTR(ret));
++		return;
++	}
++
++	if (mb->sds_link_deferred)
++		rtl8365mb_sds_link_up(mb, mb->sds_speed, mb->sds_duplex);
++	mb->sds_deferred = false;
++	mb->sds_link_deferred = false;
++
++	dev_info(priv->dev, "SerDes brought up after %s link up\n",
++		 conduit->name);
++}
++
+ static void rtl8365mb_conduit_state_change(struct dsa_switch *ds,
+ 					   const struct net_device *conduit,
+ 					   bool operational)
+@@ -1758,8 +1920,14 @@ static void rtl8365mb_conduit_state_change(struct dsa_switch *ds,
+ 	struct realtek_priv *priv = ds->priv;
+ 	struct rtl8365mb *mb = priv->chip_data;
+ 
+-	if (rtl8365mb_get_family(priv) != RTL8365MB_FAMILY_D)
++	if (rtl8365mb_get_family(priv) != RTL8365MB_FAMILY_D) {
++		if (!operational || !mb->sds_defer_needed)
++			return;
++
++		guard(mutex)(&mb->sds_cfg_lock);
++		rtl8365mb_sds_deferred_bringup(mb, conduit);
+ 		return;
++	}
+ 
+ 	guard(mutex)(&mb->sds_cfg_lock);
+ 
+@@ -2006,12 +2174,11 @@ static void rtl8365mb_pcs_get_state(struct phylink_pcs *pcs,
+ 	}
+ }
+ 
+-static void rtl8365mb_pcs_link_up(struct phylink_pcs *pcs,
+-				  unsigned int neg_mode,
+-				  phy_interface_t interface, int speed,
+-				  int duplex)
++/* The hardware half of pcs_link_up(): force the SerDes link parameters.
++ * Held back together with rtl8365mb_sds_config() while the conduit is not up.
++ */
++static void rtl8365mb_sds_link_up(struct rtl8365mb *mb, int speed, int duplex)
+ {
+-	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
+ 	struct realtek_priv *priv = mb->priv;
+ 	u32 mask = RTL8365MB_SDS_MISC_SGMII_FDUP_MASK |
+ 		   RTL8365MB_SDS_MISC_SGMII_LINK_MASK |
+@@ -2060,12 +2227,38 @@ static void rtl8365mb_pcs_link_up(struct phylink_pcs *pcs,
+ 	}
+ }
+ 
 +static void rtl8365mb_pcs_link_up(struct phylink_pcs *pcs,
 +				  unsigned int neg_mode,
 +				  phy_interface_t interface, int speed,
@@ -263,98 +327,51 @@ Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
 +
 +	if (mb->sds_defer_needed) {
-+		mutex_lock(&mb->sds_defer_lock);
++		guard(mutex)(&mb->sds_cfg_lock);
++
 +		if (mb->sds_deferred) {
 +			mb->sds_speed = speed;
 +			mb->sds_duplex = duplex;
 +			mb->sds_link_deferred = true;
-+			mutex_unlock(&mb->sds_defer_lock);
 +			return;
 +		}
-+		mutex_unlock(&mb->sds_defer_lock);
 +	}
 +
 +	rtl8365mb_sds_link_up(mb, speed, duplex);
 +}
 +
-+static void rtl8365mb_conduit_state_change(struct dsa_switch *ds,
-+					   const struct net_device *conduit,
-+					   bool operational)
-+{
-+	struct realtek_priv *priv = ds->priv;
-+	struct rtl8365mb *mb = priv->chip_data;
-+	struct dsa_port *dp;
-+	int ret;
+ static void rtl8365mb_pcs_disable(struct phylink_pcs *pcs)
+ {
+ 	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
+ 
+-	if (rtl8365mb_get_family(mb->priv) != RTL8365MB_FAMILY_D)
++	if (rtl8365mb_get_family(mb->priv) != RTL8365MB_FAMILY_D) {
++		guard(mutex)(&mb->sds_cfg_lock);
 +
-+	if (!operational || !mb->sds_defer_needed)
-+		return;
-+
-+	mutex_lock(&mb->sds_defer_lock);
-+	dp = rtl8365mb_sds_cpu_port(mb);
-+	if (!mb->sds_deferred || !dp || dp->conduit != conduit) {
-+		mutex_unlock(&mb->sds_defer_lock);
-+		return;
-+	}
-+
-+	/* On failure the bring-up stays pending, so it is tried again the
-+	 * next time the conduit comes up.
-+	 */
-+	ret = rtl8365mb_sds_config(mb, mb->sds_interface);
-+	if (!ret) {
-+		if (mb->sds_link_deferred)
-+			rtl8365mb_sds_link_up(mb, mb->sds_speed, mb->sds_duplex);
 +		mb->sds_deferred = false;
 +		mb->sds_link_deferred = false;
+ 		return;
 +	}
-+	mutex_unlock(&mb->sds_defer_lock);
-+
-+	if (ret)
-+		dev_err(priv->dev, "SerDes bring-up after %s link up failed: %pe\n",
-+			conduit->name, ERR_PTR(ret));
-+	else
-+		dev_info(priv->dev, "SerDes brought up after %s link up\n",
-+			 conduit->name);
-+}
-+
- static const struct phylink_pcs_ops rtl8365mb_pcs_ops = {
- 	.pcs_inband_caps = rtl8365mb_pcs_inband_caps,
- 	.pcs_config = rtl8365mb_pcs_config,
-@@ -4025,6 +4217,7 @@ static int rtl8365mb_setup(struct dsa_sw
+ 
+ 	guard(mutex)(&mb->sds_cfg_lock);
+ 
+@@ -4138,6 +4331,7 @@ static int rtl8365mb_setup(struct dsa_switch *ds)
  	 * (in-band mode with autonegotiation disabled).
  	 */
  	mb->pcs.poll = true;
 +	mb->sds_defer_needed = rtl8365mb_sds_defer_needed(mb);
  
- 	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D)
- 		INIT_DELAYED_WORK(&mb->sds_relatch,
-@@ -4222,6 +4415,11 @@ static void rtl8365mb_teardown(struct ds
- 	struct realtek_priv *priv = ds->priv;
- 	struct rtl8365mb *mb = priv->chip_data;
+ 	ret = rtl8365mb_reset_chip(priv);
+ 	if (ret) {
+@@ -4336,6 +4530,11 @@ static void rtl8365mb_teardown(struct dsa_switch *ds)
  
-+	mutex_lock(&mb->sds_defer_lock);
-+	mb->sds_deferred = false;
-+	mb->sds_link_deferred = false;
-+	mutex_unlock(&mb->sds_defer_lock);
-+
- 	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D)
+ 		WRITE_ONCE(mb->sds_relatch_armed, false);
  		cancel_delayed_work_sync(&mb->sds_relatch);
- 
-@@ -4298,6 +4496,10 @@ static int rtl8365mb_detect(struct realt
- 	if (ret)
- 		return ret;
- 
-+	ret = devm_mutex_init(priv->dev, &mb->sds_defer_lock);
-+	if (ret)
-+		return ret;
++	} else {
++		guard(mutex)(&mb->sds_cfg_lock);
 +
- 	mb->priv = priv;
- 	mb->cpu.trap_port = RTL8365MB_MAX_NUM_PORTS;
- 	mb->cpu.insert = RTL8365MB_CPU_INSERT_TO_ALL;
-@@ -4321,6 +4523,7 @@ static const struct dsa_switch_ops rtl83
- 	.setup = rtl8365mb_setup,
- 	.teardown = rtl8365mb_teardown,
- 	.phylink_get_caps = rtl8365mb_phylink_get_caps,
-+	.conduit_state_change = rtl8365mb_conduit_state_change,
- 	.port_enable = rtl8365mb_port_enable,
- 	.port_bridge_join = rtl8365mb_port_bridge_join,
- 	.port_bridge_leave = rtl8365mb_port_bridge_leave,
++		mb->sds_deferred = false;
++		mb->sds_link_deferred = false;
+ 	}
+ 
+ 	rtl8365mb_stats_teardown(priv);
