@@ -57,7 +57,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
 ---
 --- a/drivers/net/dsa/qca/qca8k-8xxx.c
 +++ b/drivers/net/dsa/qca/qca8k-8xxx.c
-@@ -2029,6 +2029,10 @@ static int qca8k_change_tag_protocol(str
+@@ -2042,6 +2042,10 @@ static int qca8k_change_tag_protocol(str
  		}
  	}
  
@@ -70,7 +70,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  		dsa_tag_8021q_unregister(ds);
 --- a/drivers/net/dsa/qca/qca8k-common.c
 +++ b/drivers/net/dsa/qca/qca8k-common.c
-@@ -1145,27 +1145,24 @@ int qca8k_commit_pvid(struct dsa_switch
+@@ -1164,27 +1164,24 @@ int qca8k_commit_pvid(struct dsa_switch
  
  /* Is this VID a VLAN of a VLAN-aware bridge that @port is not in? The
   * tagger picks the bridge by the VID alone, so one VID cannot serve two.
@@ -106,7 +106,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  }
  
  /* An 802.1Q upper of a port is delivered by its VID, so the VID must not
-@@ -1191,6 +1188,10 @@ int qca8k_port_prechangeupper(struct dsa
+@@ -1210,6 +1207,10 @@ int qca8k_port_prechangeupper(struct dsa
  	return 0;
  }
  
@@ -117,7 +117,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  int qca8k_port_vlan_filtering(struct dsa_switch *ds, int port,
  			      bool vlan_filtering,
  			      struct netlink_ext_ack *extack)
-@@ -1201,13 +1202,29 @@ int qca8k_port_vlan_filtering(struct dsa
+@@ -1220,13 +1221,29 @@ int qca8k_port_vlan_filtering(struct dsa
  	/* Under the tagger the ports are VLAN-aware all the time (secure
  	 * lookup, egress by the VLAN table): that is how the switch tells
  	 * the CPU where a frame came from. What a VLAN-aware bridge changes
@@ -153,7 +153,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  
  	if (vlan_filtering) {
  		ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(port),
-@@ -1262,12 +1279,106 @@ static bool qca8k_vlan_upper_elsewhere(s
+@@ -1281,12 +1298,106 @@ static bool qca8k_vlan_upper_elsewhere(s
  	return found;
  }
  
@@ -260,7 +260,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  	struct qca8k_priv *priv = ds->priv;
  	int ret;
  
-@@ -1278,6 +1389,12 @@ int qca8k_port_vlan_add(struct dsa_switc
+@@ -1297,6 +1408,12 @@ int qca8k_port_vlan_add(struct dsa_switc
  			return -EBUSY;
  		}
  
@@ -273,7 +273,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  		if (dsa_is_cpu_port(ds, port)) {
  			/* The CPU port is a tagged member of every VLAN the
  			 * user ports carry - the tagger reads the VID - and
-@@ -1286,33 +1403,28 @@ int qca8k_port_vlan_add(struct dsa_switc
+@@ -1305,33 +1422,28 @@ int qca8k_port_vlan_add(struct dsa_switc
  			 */
  			untagged = false;
  			pvid = false;
@@ -322,7 +322,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  			 */
  			NL_SET_ERR_MSG_MOD(extack,
  					   "VID is already an 802.1Q upper of another port");
-@@ -1322,6 +1434,11 @@ int qca8k_port_vlan_add(struct dsa_switc
+@@ -1341,6 +1453,11 @@ int qca8k_port_vlan_add(struct dsa_switc
  					   "VID is already a VLAN of another VLAN-aware bridge");
  			return -EBUSY;
  		}
@@ -334,7 +334,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  	}
  
  	ret = qca8k_vlan_add(priv, port, vlan->vid, untagged);
-@@ -1330,6 +1447,11 @@ int qca8k_port_vlan_add(struct dsa_switc
+@@ -1349,6 +1466,11 @@ int qca8k_port_vlan_add(struct dsa_switc
  		return ret;
  	}
  
@@ -346,7 +346,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  	if (pvid) {
  		if (priv->tag_proto == DSA_TAG_PROTO_QCA_8021Q) {
  			priv->bridge_pvid[port] = vlan->vid;
-@@ -1386,20 +1508,29 @@ int qca8k_port_vlan_del(struct dsa_switc
+@@ -1405,20 +1527,29 @@ int qca8k_port_vlan_del(struct dsa_switc
  	int ret;
  
  	/* Never committed, see qca8k_port_vlan_add(): the tag_8021q range,
@@ -397,7 +397,7 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
  #include <linux/leds.h>
  #include <linux/dsa/tag_qca.h>
  
-@@ -531,6 +532,15 @@ struct qca8k_priv {
+@@ -551,6 +552,15 @@ struct qca8k_priv {
  	 */
  	u16 tag_8021q_pvid[QCA8K_NUM_PORTS];
  	u16 bridge_pvid[QCA8K_NUM_PORTS];
@@ -410,9 +410,9 @@ Signed-off-by: Stanislaw Pal <kuncy7@gmail.com>
 +	 */
 +	unsigned long bridge_vlans[QCA8K_NUM_PORTS][BITS_TO_LONGS(VLAN_N_VID)];
 +	unsigned long upper_vlans[QCA8K_NUM_PORTS][BITS_TO_LONGS(VLAN_N_VID)];
- 	struct qca8k_port_stats port_stats[QCA8K_NUM_PORTS];
- 	struct delayed_work stats_work;
+ 	struct qca8k_mib_stats mib_stats;
  };
+ 
 --- a/drivers/net/dsa/realtek/rtl8365mb_main.c
 +++ b/drivers/net/dsa/realtek/rtl8365mb_main.c
 @@ -1011,6 +1011,15 @@ struct rtl8365mb {
