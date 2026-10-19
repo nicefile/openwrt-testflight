@@ -33,7 +33,7 @@ msgid ""
 "VLAN-aware bridge has one for each of its VLANs."
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:146
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:148
 msgid "Fast lane"
 msgstr ""
 
@@ -47,7 +47,7 @@ msgid ""
 "to the host stack"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:150
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:152
 msgid "Firmware-attached ports"
 msgstr ""
 
@@ -68,7 +68,7 @@ msgstr ""
 msgid "Link"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:183
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:185
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/status/include/16_nss_offload.js:93
 #: package/nss/luci-app-nss/root/usr/share/luci/menu.d/luci-app-nss.json:3
 msgid "NSS Offload"
@@ -95,7 +95,7 @@ msgstr ""
 msgid "NSS temperature"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:163
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:165
 msgid "No ports attached — host stack"
 msgstr ""
 
@@ -108,7 +108,7 @@ msgstr ""
 msgid "Offload active"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:166
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:168
 msgid ""
 "Offloaded packets are forwarded by the firmware and never reach the host. "
 "\"via host\" / \"to host\" is the host↔firmware exception path — what was "
@@ -130,12 +130,12 @@ msgstr ""
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:73
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:98
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:118
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:153
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:155
 msgid "Port"
 msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:78
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:158
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:160
 msgid "RX offloaded"
 msgstr ""
 
@@ -145,7 +145,7 @@ msgid "RX packets"
 msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:79
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:159
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:161
 msgid "RX to host"
 msgstr ""
 
@@ -154,7 +154,7 @@ msgid "SQM shaper"
 msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:75
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:155
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:157
 msgid "Started"
 msgstr ""
 
@@ -168,7 +168,7 @@ msgid "Switch ports and bridges on the firmware (DSA)"
 msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:76
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:156
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:158
 msgid "TX offloaded"
 msgstr ""
 
@@ -178,7 +178,7 @@ msgid "TX packets"
 msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:77
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:157
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:159
 msgid "TX via host"
 msgstr ""
 
@@ -209,7 +209,7 @@ msgstr ""
 msgid "down"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:146
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:148
 msgid "egress %s pkts / ingress %s pkts — %s marking rules"
 msgstr ""
 
@@ -243,11 +243,11 @@ msgstr ""
 msgid "no"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:144
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:146
 msgid "no NSS shaper"
 msgstr ""
 
-#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:144
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:146
 msgid "no NSS shaper on %s"
 msgstr ""
 
@@ -261,6 +261,10 @@ msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:141
 msgid "nsstbl on %s (a lane on the switch conduit %s)"
+msgstr ""
+
+#: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:145
+msgid "off (no queue enabled in /etc/config/sqm)"
 msgstr ""
 
 #: package/nss/luci-app-nss/htdocs/luci-static/resources/view/nss/status.js:99

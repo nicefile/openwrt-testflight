@@ -141,7 +141,9 @@ function renderStatus(d) {
 					? _('nsstbl on %s (a lane on the switch conduit %s)').format(d.sqm.device, d.sqm.shaping_device)
 					: _('nsstbl on %s').format(d.sqm.device)) +
 					(igs ? ' — ' + _('upload IGS: %s').format(igs) : '')
-				: (d.sqm.device ? _('no NSS shaper on %s').format(d.sqm.device) : _('no NSS shaper'))),
+				: !d.sqm.enabled
+					? _('off (no queue enabled in /etc/config/sqm)')
+					: (d.sqm.device ? _('no NSS shaper on %s').format(d.sqm.device) : _('no NSS shaper'))),
 			(d.sqm.fastlane && d.sqm.fastlane.active)
 				? row(_('Fast lane'), _('egress %s pkts / ingress %s pkts — %s marking rules').format(
 					d.sqm.fastlane.egress_pkts, d.sqm.fastlane.ingress_pkts, d.sqm.qos_marking_rules || 0))
