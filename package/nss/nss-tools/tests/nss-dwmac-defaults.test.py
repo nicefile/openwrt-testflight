@@ -243,6 +243,16 @@ json_cleanup() { :; }
               'wake_phys=90000.mdio-1:00,90000.mdio-1:02,90000.mdio-1:04'}, 'fritzbox-4050')
     assert 'nss.general.vtu' not in r, ('fritzbox-4050', r.get('nss.general.vtu'))
 
+    # Ruijie RG-MA3063: the D50 layout with the CPU on switch port 6 and
+    # three front ports (lan2-lan4 on switch ports 1-3).
+    r = run('ruijie,rg-ma3063', b3000)
+    check(r, {'network.wan.device': 'wan', 'network.@device[0].ports': 'eth1',
+              'nss.general.topology': 'lan-trunk', 'nss.general.extra_ports': '0:wan',
+              'nss.general.fw_mask': '0x3', 'nss.general.trunk': 'eth1',
+              'nss.general.switch_args': 'cpu_port=6 ports=0x4e '
+              'wake_phys=90000.mdio-1:00,90000.mdio-1:01,90000.mdio-1:02'}, 'rg-ma3063')
+    assert not r.get('nss.general.vtu'), ('rg-ma3063', r.get('nss.general.vtu'))
+
     # TP-Link Archer AX55 v1: an RTL8367S-VB on the unbind route - fabric
     # rtl8367s with the switch device at address 29, WAN on VLAN 2 of the
     # trunk like a QCA8337 board, no switch_args (the module's defaults are
@@ -423,7 +433,7 @@ json_cleanup() { :; }
     (tmp / 'mdio' / 'qca8k.off').rename(tmp / 'mdio' / 'qca8k')
 
 print('PASS: RA74 and Cudy P5 dual link, rerun, Wi-Fi choice kept, tagged WAN, '
-      'no wan6, migrated config, B3000 MAC clone, D50 LAN-only trunk, '
+      'no wan6, migrated config, B3000 MAC clone, D50 LAN-only trunk, RG-MA3063, '
       'EX511 headerless switch, dsa conduit consolidation (AX5400 fresh from board.json, '
       'existing wan section, uci override, LuCI sections, B3000, even split), '
       'Wi-Fi offload on with firmware memory mode 1, AN8855 picks dsa')

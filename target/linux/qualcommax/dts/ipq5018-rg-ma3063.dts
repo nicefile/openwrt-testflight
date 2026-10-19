@@ -165,11 +165,9 @@
 
 	label = "wan";
 
-
 	nvmem-cells = <&hw_mac_addr 0>;
 	nvmem-cell-names = "mac-address";
 };
-
 
 &ge_phy {
 	qcom,dac-preset-short-cable;
