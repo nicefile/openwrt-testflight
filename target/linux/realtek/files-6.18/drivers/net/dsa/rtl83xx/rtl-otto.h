@@ -84,6 +84,8 @@ struct rtldsa_port {
 	bool phy:1;
 	bool isolated:1;
 	bool qinq:1;
+	bool bridged:1;
+	bool vlan_filtering:1;
 	unsigned long rate_police_egress;
 	unsigned long rate_police_ingress;
 	unsigned long cached_flags;
@@ -91,6 +93,7 @@ struct rtldsa_port {
 	u16 pvid;
 	bool eee_enabled;
 	bool has_pcs;
+	bool inband;
 	int led_set;
 	enum rtldsa_flood_type flood_type;
 	int leds_on_this_port;
@@ -365,6 +368,7 @@ struct rtldsa_config {
 	bool pie_rule_id_is_log_counter;
 	/* The PIE takes ingress tc flower rules */
 	bool pie_cls_flower;
+	bool pie_mirror_group;
 	u8 num_lag_ids;
 	u8 cpu_port;
 	u8 port_ignore;
@@ -464,6 +468,7 @@ struct rtldsa_config {
 	u32 (*l2_hash_key)(struct otto_dsa_priv *priv, u64 seed);
 	u64 (*read_mcast_pmask)(int idx);
 	void (*write_mcast_pmask)(int idx, u64 portmask);
+	u32 vlan_port_aft;
 	void (*vlan_fwd_on_inner)(struct otto_dsa_priv *priv, int port, bool is_set);
 	void (*vlan_qinq_setup)(struct otto_dsa_priv *priv);
 	void (*vlan_port_qinq_set)(struct otto_dsa_priv *priv, int port, bool enable);
@@ -512,6 +517,7 @@ struct otto_dsa_priv {
 	struct mutex pie_mutex;		/* Mutex for Packet Inspection Engine */
 	int link_state_irq;
 	int mirror_group_ports[4];
+	int mirror_group_flower[4];	/* flower rules mirroring through each group */
 	const struct rtldsa_config *r;
 	struct otto_l3_ctrl *l3_ctrl;
 	u64 irq_mask;
