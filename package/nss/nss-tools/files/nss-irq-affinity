@@ -107,11 +107,17 @@ fi
 # this runs after every bring-up.
 #
 # The modem is found by its driver, not by an "mhi" interrupt: ath11k on
-# PCIe (QCN9074) runs over MHI too.
+# PCIe (QCN9074) runs over MHI too, but binds ath11k_pci. Quectel's
+# vendor pcie_mhi registers as mhi or mhi_q depending on the version,
+# and qmi_wwan_q is its vendor USB driver. The check runs once per
+# bring-up: a USB modem plugged in after it is not seen until the next.
 have_modem() {
 	local d
 	for d in /sys/bus/pci/drivers/mhi-pci-generic/0* \
+		/sys/bus/pci/drivers/mhi_q/0* \
+		/sys/bus/pci/drivers/mhi/0* \
 		/sys/bus/usb/drivers/qmi_wwan/*:* \
+		/sys/bus/usb/drivers/qmi_wwan_q/*:* \
 		/sys/bus/usb/drivers/cdc_mbim/*:* \
 		/sys/bus/usb/drivers/option/*:*; do
 		[ -e "$d" ] && return 0
