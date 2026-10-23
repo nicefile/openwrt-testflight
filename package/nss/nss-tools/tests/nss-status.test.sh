@@ -278,6 +278,56 @@ check 'mesh: a real vdev is reported as offloaded' \
 check 'mesh: a real vdev says so in the text report' \
 	1 "$(run | grep -c 'mesh offloaded')"
 
+# ---- wifili: per-radio counters of the firmware Wi-Fi data path ------------
+# The stats file comes from qca-nss-drv, which lives in the feed, not this
+# tree, so its layout is copied here from an IPQ5018 + QCN9000 board: a banner
+# per SoC, a banner per PDEV, counters as "\t<name> = <value> special". The
+# neighbouring tx_enqueue/tx_dequeue counters are given values of their own so
+# a parser that reads the wrong line fails, and PDEV 1 is all zeros, which is
+# how the driver prints a PDEV with no radio behind it.
+
+wifili_banner() { printf '\n%s\n<<<<<<<<<<<<<<< %s >>>>>>>>>>>>>>>\n%s\n\n' \
+	'________________' "$1" '________________'; }
+{
+	wifili_banner 'INTERNAL: IPQ5018'
+	wifili_banner 'PDEV 0'
+	printf '#txrx\n\n'
+	printf '\twifili[0]_rx_deliverd                   = 16550           special\n'
+	printf '\twifili[0]_tx_enqueue                    = 33601           special\n'
+	printf '\twifili[0]_tx_dequeue                    = 33602           special\n'
+	printf '\twifili[0]_tx_sent_count                 = 33603           special\n'
+	wifili_banner 'PDEV 1'
+	printf '#txrx\n\n'
+	printf '\twifili[0]_rx_deliverd                   = 0               special\n'
+	printf '\twifili[0]_tx_sent_count                 = 0               special\n'
+	wifili_banner 'ATTACH 0: QCN9000'
+	wifili_banner 'PDEV 0'
+	printf '#txrx\n\n'
+	printf '\twifili[0]_rx_deliverd                   = 177118          special\n'
+	printf '\twifili[0]_tx_enqueue                    = 2022057         special\n'
+	printf '\twifili[0]_tx_sent_count                 = 2022064         special\n'
+} > "$drv/wifili"
+
+check 'wifili: one row per radio that carried traffic' \
+	2 "$(run | grep -c -E '^    (IPQ5018|QCN9000)/[0-9]')"
+check 'wifili: the built-in radio reads tx_sent_count and rx_deliverd' \
+	'IPQ5018/0 33603 16550' "$(run | sed -n 's|^    \(IPQ5018/0\) *\([0-9]*\) *\([0-9]*\)$|\1 \2 \3|p')"
+check 'wifili: the PCIe radio is named after its chip' \
+	'QCN9000/0 2022064 177118' "$(run | sed -n 's|^    \(QCN9000/0\) *\([0-9]*\) *\([0-9]*\)$|\1 \2 \3|p')"
+check 'wifili: the JSON carries the same counters' \
+	'{"radio":"QCN9000/0","tx_sent":2022064,"rx_delivered":177118}' \
+	"$(run -j | tr -d '\n' | grep -o '{"radio":"QCN9000/0"[^}]*}')"
+
+echo 0 > "$root/sys/module/ath11k/parameters/nss_offload"
+check 'wifili: host mode shows no firmware Wi-Fi counters' \
+	0 "$(run | grep -c 'firmware Wi-Fi data path')"
+check 'wifili: and the JSON list is empty in host mode' \
+	1 "$(run -j | tr -d '\n' | grep -c '"wifili":\[\]')"
+echo 1 > "$root/sys/module/ath11k/parameters/nss_offload"
+rm -f "$drv/wifili"
+check 'wifili: no stats file, no table' \
+	0 "$(run | grep -c 'firmware Wi-Fi data path')"
+
 # ---- ipq50xx: the qca-dwmac-nss glue and the DSA port nodes ----------------
 #
 # Same report, other glue. The port and counter lines are rebuilt from the
