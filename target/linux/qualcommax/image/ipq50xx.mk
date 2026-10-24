@@ -546,6 +546,31 @@ define Device/tplink_ex511-v2
 endef
 TARGET_DEVICES += tplink_ex511-v2
 
+define Device/tplink_mx515v-v1
+	$(call Device/FitImageLzma)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := TP-Link
+	DEVICE_MODEL := MX515v
+	DEVICE_VARIANT := v1
+	DEVICE_DTS_CONFIG := config@mp03.3
+	SOC := ipq5018
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	IMAGE_SIZE := 37248k
+	NAND_SIZE := 256m
+	DEVICE_PACKAGES := ath11k-firmware-ipq5018-qcn6122 \
+		ipq-wifi-tplink_mx515v-v1 \
+		kmod-dsa-rtl8365mb \
+		kmod-usb3
+ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),)
+ifeq ($(IB),)
+	ARTIFACTS := initramfs-factory.ubi
+	ARTIFACT/initramfs-factory.ubi := append-image-stage initramfs-uImage.itb | ubinize-kernel
+endif
+endif
+endef
+TARGET_DEVICES += tplink_mx515v-v1
+
 define Device/wallys_dr5018s
 	$(call Device/FitImage)
 	$(call Device/UbiFit)

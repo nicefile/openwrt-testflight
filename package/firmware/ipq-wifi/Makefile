@@ -122,6 +122,7 @@ ALLWIFIBOARDS:= \
 	tplink_eap650-outdoor-v1 \
 	tplink_eap660hd-v1 \
 	tplink_ex511-v2 \
+	tplink_mx515v-v1 \
 	tplink_re700x \
 	tplink_tl-wa1201-v2 \
 	ubnt_utr \
@@ -341,6 +342,7 @@ $(eval $(call generate-ipq-wifi-package,tplink_eap625-outdoor-hd-v1,TP-Link EAP6
 $(eval $(call generate-ipq-wifi-package,tplink_eap650-outdoor-v1,TP-Link EAP650-Outdoor v1))
 $(eval $(call generate-ipq-wifi-package,tplink_eap660hd-v1,TP-Link EAP660 HD v1))
 $(eval $(call generate-ipq-wifi-package,tplink_ex511-v2,TP-Link EX511 v2))
+$(eval $(call generate-ipq-wifi-package,tplink_mx515v-v1,TP-Link MX515v))
 $(eval $(call generate-ipq-wifi-package,tplink_re700x,TP-Link RE700X))
 $(eval $(call generate-ipq-wifi-package,tplink_tl-wa1201-v2,TP-Link TL-WA1201 V2))
 $(eval $(call generate-ipq-wifi-package,ubnt_utr,Ubiquiti UniFi Travel Router))
